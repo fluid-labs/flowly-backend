@@ -1,0 +1,239 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String   @id @default(cuid())
+  telegramId        String   @unique
+  telegramUsername  String?
+  firstName         String?
+  lastName          String?
+  languageCode      String?
+  isBot             Boolean  @default(false)
+  isPremium         Boolean  @default(false)
+  
+  // Wallet Information
+  encryptedPrivateKey String
+  walletAddress       String   @unique
+  
+  // User Preferences
+  isActive          Boolean  @default(true)
+  notifications     Boolean  @default(true)
+  
+  // Timestamps
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  lastActiveAt      DateTime @default(now())
+  
+  // Relations
+  transactions      Transaction[]
+  wallets          Wallet[]
+  tradingPairs     TradingPair[]
+  
+  @@map("users")
+}
+
+model Wallet {
+  id              String   @id @default(cuid())
+  userId          String
+  processId       String   @unique
+  name            String?
+  description     String?
+  
+  // Wallet Type (main, trading, savings, etc.)
+  walletType      WalletType @default(MAIN)
+  
+  // Balance tracking
+  lastBalanceCheck DateTime?
+  
+  // Status
+  isActive        Boolean  @default(true)
+  
+  // Timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions    Transaction[]
+  
+  @@map("wallets")
+}
+
+model Transaction {
+  id              String   @id @default(cuid())
+  userId          String
+  walletId        String?
+  
+  // Transaction Details
+  txId            String   @unique
+  processId       String
+  messageId       String?
+  
+  // Transaction Type
+  type            TransactionType
+  action          String
+  
+  // Amount and Token Information
+  amount          String
+  tokenId         String?
+  tokenSymbol     String?
+  
+  // Addresses
+  fromAddress     String
+  toAddress       String
+  
+  // Status and Result
+  status          TransactionStatus @default(PENDING)
+  result          Json?
+  errorMessage    String?
+  
+  // Gas and Fees
+  gasUsed         String?
+  fee             String?
+  
+  // Timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  confirmedAt     DateTime?
+  
+  // Relations
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallet          Wallet?  @relation(fields: [walletId], references: [id], onDelete: SetNull)
+  
+  @@map("transactions")
+}
+
+model TradingPair {
+  id              String   @id @default(cuid())
+  userId          String
+  
+  // Token Pair Information
+  baseTokenId     String
+  baseTokenSymbol String
+  quoteTokenId    String
+  quoteTokenSymbol String
+  
+  // Trading Configuration
+  isActive        Boolean  @default(true)
+  slippageTolerance Decimal @default(0.5) // Percentage
+  
+  // Price Alerts
+  priceAlertHigh  Decimal?
+  priceAlertLow   Decimal?
+  
+  // Statistics
+  totalTrades     Int      @default(0)
+  totalVolume     String   @default("0")
+  
+  // Timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, baseTokenId, quoteTokenId])
+  @@map("trading_pairs")
+}
+
+model Token {
+  id              String   @id @default(cuid())
+  processId       String   @unique
+  
+  // Token Information
+  name            String
+  symbol          String
+  denomination    Int      @default(6)
+  logo            String?
+  
+  // Token Metadata
+  description     String?
+  website         String?
+  totalSupply     String?
+  
+  // Price Information
+  currentPrice    Decimal?
+  priceChange24h  Decimal?
+  volume24h       String?
+  marketCap       String?
+  
+  // Status
+  isActive        Boolean  @default(true)
+  isVerified      Boolean  @default(false)
+  
+  // Timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  lastPriceUpdate DateTime?
+  
+  @@map("tokens")
+}
+
+model Session {
+  id              String   @id @default(cuid())
+  userId          String
+  telegramChatId  String
+  
+  // Session Data
+  sessionData     Json?
+  currentStep     String?
+  
+  // Session State
+  isActive        Boolean  @default(true)
+  
+  // Timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  expiresAt       DateTime
+  
+  @@unique([userId, telegramChatId])
+  @@map("sessions")
+}
+
+model SystemConfig {
+  id              String   @id @default(cuid())
+  key             String   @unique
+  value           String
+  description     String?
+  
+  // Timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@map("system_config")
+}
+
+// Enums
+enum WalletType {
+  MAIN
+  TRADING
+  SAVINGS
+  STAKING
+}
+
+enum TransactionType {
+  SEND
+  RECEIVE
+  SWAP
+  STAKE
+  UNSTAKE
+  MINT
+  BURN
+  APPROVE
+}
+
+enum TransactionStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+  CANCELLED
+}
