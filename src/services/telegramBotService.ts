@@ -5,10 +5,12 @@ import { logger } from "@/utils/logger";
 import { userService } from "@/services/userService";
 import { aoWalletService } from "@/services/aoWalletService";
 import { encryptionService } from "@/utils/encryption";
+import { LangChainService, ConversationMessage } from "./langchainService";
 
 export interface BotContext extends Context {
     user?: any;
     session?: any;
+    conversationMode?: boolean;
 }
 
 export interface CommandHandler {
@@ -20,12 +22,16 @@ export interface CommandHandler {
 export class TelegramBotService {
     private bot: Telegraf<BotContext>;
     private commands: Map<string, CommandHandler> = new Map();
+    private langChainService: LangChainService;
+    private conversationHistory: Map<number, ConversationMessage[]> = new Map();
 
     constructor() {
         this.bot = new Telegraf<BotContext>(config.telegram.botToken);
+        this.langChainService = new LangChainService();
         this.setupMiddleware();
         this.setupCommands();
         this.setupCallbackHandlers();
+        this.setupMessageHandlers();
         this.setupErrorHandling();
     }
 
@@ -149,6 +155,20 @@ export class TelegramBotService {
             description: "View account statistics",
             handler: this.handleStats.bind(this),
         });
+
+        // Conversation command
+        this.addCommand({
+            command: "chat",
+            description: "Start AI conversation mode",
+            handler: this.handleStartConversation.bind(this),
+        });
+
+        // Stop conversation command
+        this.addCommand({
+            command: "stopchat",
+            description: "Stop AI conversation mode",
+            handler: this.handleStopConversation.bind(this),
+        });
     }
 
     /**
@@ -202,6 +222,7 @@ export class TelegramBotService {
                     Markup.button.callback("⚙️ Settings", "settings"),
                     Markup.button.callback("❓ Help", "help"),
                 ],
+                [Markup.button.callback("🤖 Start Conversation", "start_chat")],
             ]);
 
             await ctx.reply(message, {
@@ -377,7 +398,11 @@ export class TelegramBotService {
                 message += `/${cmd.command} - ${cmd.description}\n`;
             });
 
-            message += `\n**Advanced Commands:**\n`;
+            message += `\n**AI Conversation:**\n`;
+            message += `/chat - Start AI conversation mode\n`;
+            message += `/stopchat - Stop AI conversation mode\n\n`;
+
+            message += `**Advanced Commands:**\n`;
             message += `/transfer <token_id> <recipient> <amount> - Send tokens\n`;
             message += `/token_balance <token_id> - Check token balance\n`;
             message += `/token_info <token_id> - Get token information\n\n`;
@@ -431,6 +456,67 @@ export class TelegramBotService {
     }
 
     /**
+     * Handle /chat command - Start conversation mode
+     */
+    private async handleStartConversation(ctx: BotContext): Promise<void> {
+        try {
+            const telegramId = ctx.from?.id;
+            if (!telegramId) return;
+
+            // Initialize conversation history
+            this.conversationHistory.set(telegramId, []);
+            ctx.conversationMode = true;
+
+            let message = `🤖 **AI Conversation Mode Activated**\n\n`;
+            message += `You can now chat with me naturally! I can help you with:\n\n`;
+            message += `💸 **Token Transfers** - "Send 10 AO to abc123..."\n`;
+            message += `💰 **Balance Checks** - "What's my balance?"\n`;
+            message += `📊 **Account Info** - "Show my wallet details"\n`;
+            message += `❓ **General Help** - Ask me anything about AO tokens\n\n`;
+            message += `💡 **Example:** "Send 5 AO tokens to def456..."\n\n`;
+            message += `Type /stopchat to exit conversation mode.`;
+
+            const keyboard = Markup.inlineKeyboard([
+                [Markup.button.callback("❌ Stop Chat", "stop_chat")],
+            ]);
+
+            await ctx.reply(message, {
+                parse_mode: "Markdown",
+                ...keyboard,
+            });
+
+            logger.info("Conversation mode started", { telegramId });
+        } catch (error) {
+            logger.error("Error starting conversation:", error);
+            await ctx.reply("❌ Failed to start conversation mode.");
+        }
+    }
+
+    /**
+     * Handle /stopchat command - Stop conversation mode
+     */
+    private async handleStopConversation(ctx: BotContext): Promise<void> {
+        try {
+            const telegramId = ctx.from?.id;
+            if (!telegramId) return;
+
+            // Clear conversation history
+            this.conversationHistory.delete(telegramId);
+            ctx.conversationMode = false;
+
+            await ctx.reply(
+                "🤖 **Conversation mode deactivated.**\n\nYou can use regular commands now. Type /chat to start conversation mode again.",
+                { parse_mode: "Markdown" }
+            );
+
+            logger.info("Conversation mode stopped", { telegramId });
+        } catch (error) {
+            logger.error("Error stopping conversation:", error);
+            await ctx.reply("❌ Failed to stop conversation mode.");
+        }
+    }
+
+    /**
      * Handle /stats command
      */
     private async handleStats(ctx: BotContext): Promise<void> {
@@ -466,6 +552,93 @@ export class TelegramBotService {
     }
 
     /**
+     * Setup message handlers for conversation mode
+     */
+    private setupMessageHandlers(): void {
+        // Handle text messages in conversation mode
+        this.bot.on("text", async (ctx) => {
+            try {
+                const telegramId = ctx.from?.id;
+                if (!telegramId) return;
+
+                // Skip if it's a command
+                if ((ctx.message as any).text?.startsWith("/")) return;
+
+                // Check if user is in conversation mode
+                const hasConversationHistory =
+                    this.conversationHistory.has(telegramId);
+
+                if (hasConversationHistory) {
+                    await this.handleConversationMessage(ctx);
+                }
+            } catch (error) {
+                logger.error("Error handling text message:", error);
+                await ctx.reply(
+                    "❌ Error processing your message. Please try again."
+                );
+            }
+        });
+    }
+
+    /**
+     * Handle conversation messages
+     */
+    private async handleConversationMessage(ctx: BotContext): Promise<void> {
+        try {
+            const telegramId = ctx.from?.id;
+            const userMessage = (ctx.message as any)?.text;
+
+            if (!telegramId || !userMessage) return;
+
+            // Show typing indicator
+            await ctx.sendChatAction("typing");
+
+            // Get conversation history
+            const history = this.conversationHistory.get(telegramId) || [];
+
+            // Add user message to history
+            const userMsg: ConversationMessage = {
+                role: "user",
+                content: userMessage,
+                timestamp: new Date(),
+            };
+            history.push(userMsg);
+
+            // Process with LangChain
+            const aiResponse = await this.langChainService.processMessage(
+                telegramId,
+                userMessage,
+                history.slice(-10) // Keep last 10 messages for context
+            );
+
+            // Add AI response to history
+            const aiMsg: ConversationMessage = {
+                role: "assistant",
+                content: aiResponse,
+                timestamp: new Date(),
+            };
+            history.push(aiMsg);
+
+            // Update conversation history (keep last 20 messages)
+            this.conversationHistory.set(telegramId, history.slice(-20));
+
+            // Send response
+            await ctx.reply(aiResponse, { parse_mode: "Markdown" });
+
+            logger.info("Conversation message processed", {
+                telegramId,
+                userMessageLength: userMessage.length,
+                aiResponseLength: aiResponse.length,
+            });
+        } catch (error) {
+            logger.error("Error in conversation message:", error);
+            await ctx.reply(
+                "🤖 I encountered an error processing your message. Please try again or use /stopchat to exit conversation mode."
+            );
+        }
+    }
+
+    /**
      * Setup callback query handlers
      */
     private setupCallbackHandlers(): void {
@@ -479,6 +652,10 @@ export class TelegramBotService {
         this.bot.action("refresh_balance", this.handleBalance.bind(this));
         this.bot.action("refresh_history", this.handleHistory.bind(this));
         this.bot.action("refresh_stats", this.handleStats.bind(this));
+
+        // Conversation mode callbacks
+        this.bot.action("start_chat", this.handleStartConversation.bind(this));
+        this.bot.action("stop_chat", this.handleStopConversation.bind(this));
 
         this.bot.action(
             "toggle_notifications",
@@ -631,6 +808,11 @@ export class TelegramBotService {
                     { command: "send", description: "Send tokens" },
                     { command: "history", description: "Transaction history" },
                     { command: "stats", description: "Account statistics" },
+                    { command: "chat", description: "Start AI conversation" },
+                    {
+                        command: "stopchat",
+                        description: "Stop AI conversation",
+                    },
                     { command: "settings", description: "Bot settings" },
                     { command: "help", description: "Show help" },
                 ]);

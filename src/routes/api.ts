@@ -84,4 +84,16 @@ router.get(
 router.get("/health", apiController.healthCheck);
 router.get("/stats", rateLimitMiddleware, apiController.getSystemStats);
 
+// Test endpoints
+router.post(
+    "/test/user/:telegramId",
+    rateLimitMiddleware,
+    apiController.createTestUser
+);
+router.post(
+    "/test/langchain/:telegramId",
+    rateLimitMiddleware,
+    apiController.testLangChain
+);
+
 export default router;

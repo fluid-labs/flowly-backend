@@ -53,6 +53,11 @@ const envSchema = Joi.object({
 
     // Webhook Security
     WEBHOOK_SECRET: Joi.string().allow("").optional(),
+
+    // LangChain/OpenAI Configuration
+    OPENAI_API_KEY: Joi.string().required(),
+    LLM_MODEL: Joi.string().default("gpt-4o-mini"),
+    LLM_TEMPERATURE: Joi.number().min(0).max(2).default(0.1),
 }).unknown();
 
 // Validate environment variables
@@ -103,6 +108,11 @@ export interface Config {
     webhook?: {
         secret: string;
     };
+    llm: {
+        openaiApiKey: string;
+        model: string;
+        temperature: number;
+    };
 }
 
 export const config: Config = {
@@ -143,6 +153,11 @@ export const config: Config = {
     logging: {
         level: envVars.LOG_LEVEL,
         filePath: envVars.LOG_FILE_PATH,
+    },
+    llm: {
+        openaiApiKey: envVars.OPENAI_API_KEY,
+        model: envVars.LLM_MODEL,
+        temperature: envVars.LLM_TEMPERATURE,
     },
 };
 

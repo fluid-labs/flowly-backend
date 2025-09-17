@@ -3,6 +3,7 @@ import { userService } from "@/services/userService";
 import { aoWalletService } from "@/services/aoWalletService";
 import { logger } from "@/utils/logger";
 import { dbService } from "@/config/database";
+import { LangChainService } from "@/services/langchainService";
 
 export class ApiController {
     /**
@@ -347,6 +348,105 @@ export class ApiController {
         } catch (error) {
             logger.error("Failed to get system stats:", error);
             res.status(500).json({ error: "Failed to get system stats" });
+        }
+    }
+    /**
+     * Create a test user
+     */
+    public async createTestUser(req: Request, res: Response): Promise<void> {
+        try {
+            const { telegramId } = req.params;
+            const { firstName, lastName, telegramUsername } = req.body;
+
+            if (!telegramId) {
+                res.status(400).json({
+                    error: "Telegram ID is required",
+                });
+                return;
+            }
+
+            // Check if user already exists
+            const existingUser = await userService.getUserByTelegramId(
+                telegramId
+            );
+            if (existingUser) {
+                res.json({
+                    success: true,
+                    message: "User already exists",
+                    user: {
+                        id: existingUser.id,
+                        telegramId: existingUser.telegramId,
+                        walletAddress: existingUser.walletAddress,
+                        firstName: existingUser.firstName,
+                    },
+                });
+                return;
+            }
+
+            // Create new user
+            const user = await userService.createUser({
+                telegramId,
+                firstName: firstName || "Test User",
+                lastName: lastName || "",
+                telegramUsername: telegramUsername || "",
+            });
+
+            res.json({
+                success: true,
+                message: "User created successfully",
+                user: {
+                    id: user.id,
+                    telegramId: user.telegramId,
+                    walletAddress: user.walletAddress,
+                    firstName: user.firstName,
+                },
+            });
+        } catch (error) {
+            logger.error("Create test user error:", error);
+            res.status(500).json({
+                error: "Failed to create test user",
+                details:
+                    error instanceof Error ? error.message : "Unknown error",
+            });
+        }
+    }
+
+    /**
+     * Test LangChain functionality
+     */
+    public async testLangChain(req: Request, res: Response): Promise<void> {
+        try {
+            const { telegramId } = req.params;
+            const { message } = req.body;
+
+            if (!telegramId || !message) {
+                res.status(400).json({
+                    error: "Telegram ID and message are required",
+                });
+                return;
+            }
+
+            const langChainService = new LangChainService();
+
+            const response = await langChainService.processMessage(
+                parseInt(telegramId),
+                message,
+                []
+            );
+
+            res.json({
+                success: true,
+                userMessage: message,
+                aiResponse: response,
+                telegramId: telegramId,
+            });
+        } catch (error) {
+            logger.error("LangChain test error:", error);
+            res.status(500).json({
+                error: "Failed to process LangChain request",
+                details:
+                    error instanceof Error ? error.message : "Unknown error",
+            });
         }
     }
 }
