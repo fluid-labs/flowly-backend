@@ -73,11 +73,23 @@ export class TelegramBotService {
                 }
 
                 await next();
-            } catch (error) {
+            } catch (error: any) {
                 logger.error("Middleware error:", error);
-                await ctx.reply(
-                    "❌ An error occurred. Please try again later."
-                );
+
+                // Don't try to reply if user blocked the bot
+                if (error.code !== 403) {
+                    try {
+                        await this.safeSendMessage(
+                            ctx,
+                            "❌ An error occurred. Please try again later."
+                        );
+                    } catch (replyError) {
+                        logger.error(
+                            "Failed to send middleware error message:",
+                            replyError
+                        );
+                    }
+                }
             }
         });
 
@@ -225,13 +237,16 @@ export class TelegramBotService {
                 [Markup.button.callback("🤖 Start Conversation", "start_chat")],
             ]);
 
-            await ctx.reply(message, {
+            await this.safeSendMessage(ctx, message, {
                 parse_mode: "Markdown",
                 ...keyboard,
             });
         } catch (error) {
             logger.error("Error in start command:", error);
-            await ctx.reply("❌ Failed to initialize. Please try again.");
+            await this.safeSendMessage(
+                ctx,
+                "❌ Failed to initialize. Please try again."
+            );
         }
     }
 
@@ -267,13 +282,14 @@ export class TelegramBotService {
                 ],
             ]);
 
-            await ctx.reply(message, {
+            await this.safeSendMessage(ctx, message, {
                 parse_mode: "Markdown",
                 ...keyboard,
             });
         } catch (error) {
             logger.error("Error in wallet command:", error);
-            await ctx.reply(
+            await this.safeSendMessage(
+                ctx,
                 "❌ Failed to fetch wallet information. Please try again."
             );
         }
@@ -286,7 +302,11 @@ export class TelegramBotService {
         try {
             const user = ctx.user;
 
-            await ctx.reply("🔄 Checking balance...");
+            const loadingMessage = await this.safeSendMessage(
+                ctx,
+                "🔄 Checking balance..."
+            );
+            if (!loadingMessage) return; // User blocked bot
 
             // Get AR balance
             const arBalance = await aoWalletService.getWalletBalance(
@@ -306,13 +326,16 @@ export class TelegramBotService {
                 ],
             ]);
 
-            await ctx.editMessageText(message, {
+            await this.safeEditMessage(ctx, message, {
                 parse_mode: "Markdown",
                 ...keyboard,
             });
         } catch (error) {
             logger.error("Error in balance command:", error);
-            await ctx.reply("❌ Failed to fetch balance. Please try again.");
+            await this.safeSendMessage(
+                ctx,
+                "❌ Failed to fetch balance. Please try again."
+            );
         }
     }
 
@@ -623,7 +646,10 @@ export class TelegramBotService {
             this.conversationHistory.set(telegramId, history.slice(-20));
 
             // Send response
-            await ctx.reply(aiResponse, { parse_mode: "Markdown" });
+            const sent = await this.safeSendMessage(ctx, aiResponse, {
+                parse_mode: "Markdown",
+            });
+            if (!sent) return; // User blocked bot
 
             logger.info("Conversation message processed", {
                 telegramId,
@@ -632,7 +658,8 @@ export class TelegramBotService {
             });
         } catch (error) {
             logger.error("Error in conversation message:", error);
-            await ctx.reply(
+            await this.safeSendMessage(
+                ctx,
                 "🤖 I encountered an error processing your message. Please try again or use /stopchat to exit conversation mode."
             );
         }
@@ -717,15 +744,75 @@ export class TelegramBotService {
      * Setup error handling
      */
     private setupErrorHandling(): void {
-        this.bot.catch((err, ctx) => {
+        this.bot.catch((err: any, ctx) => {
+            // Handle specific Telegram API errors
+            if (err.code === 403) {
+                // User blocked the bot - log but don't crash
+                logger.warn("User blocked the bot", {
+                    telegramId: ctx.from?.id,
+                    error: err.description,
+                });
+                return;
+            }
+
+            if (
+                err.code === 400 &&
+                err.description?.includes("chat not found")
+            ) {
+                // Chat not found - user deleted chat
+                logger.warn("Chat not found", {
+                    telegramId: ctx.from?.id,
+                    error: err.description,
+                });
+                return;
+            }
+
+            if (err.code === 429) {
+                // Rate limited - log and continue
+                logger.warn("Rate limited by Telegram", {
+                    telegramId: ctx.from?.id,
+                    error: err.description,
+                });
+                return;
+            }
+
             logger.error("Bot error:", err);
-            ctx.reply(
-                "❌ An unexpected error occurred. Please try again later."
-            );
+
+            // Only try to reply if the error isn't related to blocked user
+            if (err.code !== 403) {
+                try {
+                    ctx.reply(
+                        "❌ An unexpected error occurred. Please try again later."
+                    );
+                } catch (replyError) {
+                    logger.error("Failed to send error message:", replyError);
+                }
+            }
         });
 
         // Handle unhandled promise rejections
-        process.on("unhandledRejection", (reason, promise) => {
+        process.on("unhandledRejection", (reason: any, promise) => {
+            // Check if it's a Telegram API error for blocked user
+            if (
+                reason?.code === 403 &&
+                reason?.description?.includes("bot was blocked")
+            ) {
+                logger.warn("Unhandled rejection: User blocked bot", {
+                    error: reason.description,
+                });
+                return;
+            }
+
+            if (
+                reason?.code === 400 &&
+                reason?.description?.includes("chat not found")
+            ) {
+                logger.warn("Unhandled rejection: Chat not found", {
+                    error: reason.description,
+                });
+                return;
+            }
+
             logger.error("Unhandled Rejection at:", promise, "reason:", reason);
         });
 
@@ -751,6 +838,78 @@ export class TelegramBotService {
                 return "🚫";
             default:
                 return "❓";
+        }
+    }
+
+    /**
+     * Safely send a message, handling blocked users
+     */
+    private async safeSendMessage(
+        ctx: BotContext,
+        message: string,
+        options?: any
+    ): Promise<boolean> {
+        try {
+            await ctx.reply(message, options);
+            return true;
+        } catch (error: any) {
+            if (error.code === 403) {
+                logger.warn("Cannot send message - user blocked bot", {
+                    telegramId: ctx.from?.id,
+                    error: error.description,
+                });
+                return false;
+            }
+
+            if (
+                error.code === 400 &&
+                error.description?.includes("chat not found")
+            ) {
+                logger.warn("Cannot send message - chat not found", {
+                    telegramId: ctx.from?.id,
+                    error: error.description,
+                });
+                return false;
+            }
+
+            // Re-throw other errors
+            throw error;
+        }
+    }
+
+    /**
+     * Safely edit a message, handling blocked users
+     */
+    private async safeEditMessage(
+        ctx: BotContext,
+        message: string,
+        options?: any
+    ): Promise<boolean> {
+        try {
+            await ctx.editMessageText(message, options);
+            return true;
+        } catch (error: any) {
+            if (error.code === 403) {
+                logger.warn("Cannot edit message - user blocked bot", {
+                    telegramId: ctx.from?.id,
+                    error: error.description,
+                });
+                return false;
+            }
+
+            if (
+                error.code === 400 &&
+                error.description?.includes("chat not found")
+            ) {
+                logger.warn("Cannot edit message - chat not found", {
+                    telegramId: ctx.from?.id,
+                    error: error.description,
+                });
+                return false;
+            }
+
+            // Re-throw other errors
+            throw error;
         }
     }
 
