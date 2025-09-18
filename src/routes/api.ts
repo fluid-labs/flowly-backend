@@ -4,7 +4,7 @@ import { rateLimitMiddleware } from "@/middleware/rateLimit";
 import { validateRequest } from "@/middleware/validation";
 import Joi from "joi";
 
-const router = Router();
+const router: Router = Router();
 
 // Validation schemas
 const sendTokensSchema = Joi.object({

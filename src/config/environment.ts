@@ -33,6 +33,11 @@ const envSchema = Joi.object({
     AO_AUTHORITY_ADDRESS: Joi.string().default(
         "fcoN_xJeisVsPXA-trzVAuIiqO3ydLQxM-L4XbrQKzY"
     ),
+    AO_NATIVE_TOKEN_PROCESS_ID: Joi.string().default(
+        "0syT13r0s0tgPmIed95bJnuSqaD29HQNN8D3ElLSrsc"
+    ),
+    AO_NATIVE_TOKEN_DECIMALS: Joi.number().integer().min(0).default(12),
+    AO_TRACKED_TOKENS: Joi.string().allow("").optional(),
 
     // Security Configuration
     JWT_SECRET: Joi.string().min(32).required(),
@@ -89,6 +94,9 @@ export interface Config {
         gatewayUrl: string;
         schedulerAddress: string;
         authorityAddress: string;
+        nativeTokenProcessId: string;
+        nativeTokenDecimals: number;
+        trackedTokens?: string[];
     };
     security: {
         jwtSecret: string;
@@ -141,6 +149,8 @@ export const config: Config = {
         gatewayUrl: envVars.AO_GATEWAY_URL,
         schedulerAddress: envVars.AO_SCHEDULER_ADDRESS,
         authorityAddress: envVars.AO_AUTHORITY_ADDRESS,
+        nativeTokenProcessId: envVars.AO_NATIVE_TOKEN_PROCESS_ID,
+        nativeTokenDecimals: envVars.AO_NATIVE_TOKEN_DECIMALS,
     },
     security: {
         jwtSecret: envVars.JWT_SECRET,
@@ -168,6 +178,16 @@ if (envVars.REDIS_URL && envVars.REDIS_URL.trim() !== "") {
 
 if (envVars.WEBHOOK_SECRET && envVars.WEBHOOK_SECRET.trim() !== "") {
     config.webhook = { secret: envVars.WEBHOOK_SECRET };
+}
+
+// Optional tracked tokens list (comma-separated)
+if (envVars.AO_TRACKED_TOKENS && envVars.AO_TRACKED_TOKENS.trim() !== "") {
+    const tokens = envVars.AO_TRACKED_TOKENS.split(",")
+        .map((s: string) => s.trim())
+        .filter(Boolean);
+    if (tokens.length) {
+        config.ao.trackedTokens = tokens;
+    }
 }
 
 export default config;

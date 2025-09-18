@@ -2,7 +2,7 @@ import { Router } from "express";
 import { webhookController } from "@/controllers/webhookController";
 import { rateLimitMiddleware } from "@/middleware/rateLimit";
 
-const router = Router();
+const router: Router = Router();
 
 // Telegram webhook endpoint
 router.post(

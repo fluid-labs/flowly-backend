@@ -94,13 +94,37 @@ export class LangChainService {
                     // Create signer
                     const signer = createDataItemSigner(wallet);
 
-                    // Default AO token process ID (you may want to make this configurable)
+                    // Default AO token process ID (configurable)
                     const processId =
-                        params.tokenProcessId ||
-                        "Sa0iBLPNyJQrwpTTG-tWLQU-1QeUAJA73DdxGGiKoJc";
+                        params.tokenProcessId || config.ao.nativeTokenProcessId;
+
+                    // Determine quantity in base units
+                    const amtRaw = params.amount.trim();
+                    let quantity = amtRaw;
+                    const isAll = ["all", "max"].includes(amtRaw.toLowerCase());
+                    if (isAll) {
+                        // Fetch full balance in base units
+                        const bal = await this.getRawBalance(
+                            processId,
+                            user.walletAddress
+                        );
+                        if (bal === "0") {
+                            return "❌ Insufficient balance to transfer.";
+                        }
+                        quantity = bal;
+                    } else {
+                        // If decimal provided, convert to base units for native AO
+                        const decimals =
+                            processId === config.ao.nativeTokenProcessId ? 12 : 0;
+                        if (decimals > 0 && /\./.test(amtRaw)) {
+                            const big = new (require("big.js")) (amtRaw);
+                            const denom = new (require("big.js")) (10).pow(decimals);
+                            quantity = big.times(denom).round(0, 0).toString();
+                        }
+                    }
 
                     // Send transfer message to AO process
-                    const messageResult = await this.aoConnect.message({
+                    const sendRes = await this.aoConnect.message({
                         process: processId,
                         tags: [
                             { name: "Action", value: "Transfer" },
@@ -108,17 +132,27 @@ export class LangChainService {
                                 name: "Recipient",
                                 value: params.recipientAddress,
                             },
-                            { name: "Quantity", value: params.amount },
+                            { name: "Quantity", value: quantity },
                         ],
                         signer,
                         data: "",
                     });
+                    const messageId = typeof sendRes === "string" ? sendRes : sendRes?.id;
 
-                    logger.info(`Transfer initiated: ${messageResult.id}`, {
+                    // Debug logs
+                    console.log("[transfer-asset] process:", processId);
+                    console.log("[transfer-asset] tags:", {
+                        Action: "Transfer",
+                        Recipient: params.recipientAddress,
+                        Quantity: quantity,
+                    });
+                    console.log("[transfer-asset] messageId:", messageId);
+
+                    logger.info(`Transfer initiated: ${messageId}`, {
                         telegramId,
                         recipient: params.recipientAddress,
                         amount: params.amount,
-                        messageId: messageResult.id,
+                        messageId,
                     });
 
                     // Wait a moment and check the result
@@ -126,7 +160,7 @@ export class LangChainService {
 
                     try {
                         const result = await this.aoConnect.result({
-                            message: messageResult.id,
+                            message: messageId,
                             process: processId,
                         });
 
@@ -134,21 +168,15 @@ export class LangChainService {
                             return `Transfer failed: ${result.Error}`;
                         }
 
-                        return `✅ Transfer successful! 
-                        - Amount: ${params.amount} AO tokens
-                        - Recipient: ${params.recipientAddress}
-                        - Transaction ID: ${messageResult.id}
-                        - Status: ${result.Output || "Completed"}`;
+                        console.log("[transfer-asset] result:", result);
+
+                        return `✅ Transfer initiated!\n- Amount: ${params.amount} AO\n- Recipient: ${params.recipientAddress}\n- TxID: ${messageId}\n- Status: ${result.Output || "Submitted"}`;
                     } catch (resultError) {
                         logger.warn(
                             "Could not fetch transfer result immediately",
                             { error: resultError }
                         );
-                        return `🔄 Transfer initiated successfully!
-                        - Amount: ${params.amount} AO tokens  
-                        - Recipient: ${params.recipientAddress}
-                        - Transaction ID: ${messageResult.id}
-                        - Status: Processing (check back in a few moments)`;
+                        return `🔄 Transfer initiated successfully!\n- Amount: ${params.amount} AO\n- Recipient: ${params.recipientAddress}\n- TxID: ${messageId}\n- Status: Processing`;
                     }
                 } catch (error) {
                     logger.error("Transfer asset tool error", {
@@ -158,6 +186,34 @@ export class LangChainService {
                     return `Error processing transfer: ${
                         error instanceof Error ? error.message : "Unknown error"
                     }`;
+                }
+            },
+        });
+    }
+
+    /**
+     * Create the get wallet address tool for LangChain
+     */
+    private createGetWalletAddressTool(telegramId: number): DynamicTool {
+        return new DynamicTool({
+            name: "get-wallet-address",
+            description:
+                "Return the user's AO wallet address as plain text. No input required.",
+            func: async () => {
+                try {
+                    const user = await this.userService.getUserByTelegramId(
+                        telegramId.toString()
+                    );
+                    if (!user || !user.walletAddress) {
+                        return "❌ Wallet not found. Please create a wallet first using /start";
+                    }
+                    return `\`${user.walletAddress}\``;
+                } catch (error) {
+                    logger.error("Get wallet address tool error", {
+                        error,
+                        telegramId,
+                    });
+                    return "❌ Error retrieving wallet address.";
                 }
             },
         });
@@ -198,8 +254,7 @@ export class LangChainService {
                     }
 
                     const processId =
-                        params.tokenProcessId ||
-                        "Sa0iBLPNyJQrwpTTG-tWLQU-1QeUAJA73DdxGGiKoJc";
+                        params.tokenProcessId || config.ao.nativeTokenProcessId;
 
                     // Use dryrun to get balance
                     const result = await this.aoConnect.dryrun({
@@ -213,12 +268,21 @@ export class LangChainService {
 
                     if (result.Messages && result.Messages.length > 0) {
                         const balanceMessage = result.Messages[0];
-                        const balance =
+                        const rawBalance =
                             balanceMessage.Data ||
                             balanceMessage.Tags?.find(
                                 (tag: any) => tag.name === "Balance"
                             )?.value ||
                             "0";
+
+                        const decimals =
+                            processId === config.ao.nativeTokenProcessId
+                                ? (config.ao.nativeTokenDecimals ?? 12)
+                                : 0;
+                        const balance = this.formatAmountWithDecimals(
+                            rawBalance,
+                            decimals
+                        );
 
                         return `💰 **Your Balance**
                         
@@ -246,6 +310,220 @@ export class LangChainService {
                 }
             },
         });
+    }
+
+    /**
+     * Create the balances listing tool for LangChain (AO Balances action)
+     */
+    private createListTokenBalancesTool(telegramId: number): DynamicTool {
+        return new DynamicTool({
+            name: "list-token-balances",
+            description: `List all balances for a given AO token process using the Balances action.
+            Input should be a JSON object with:
+            - tokenProcessId: The AO token process ID (required)
+            - limit: Optional number of entries to request (default 1000)
+            - cursor: Optional cursor for pagination`,
+            func: async (input: string) => {
+                try {
+                    const { tokenProcessId, limit, cursor } = JSON.parse(input || "{}");
+                    if (!tokenProcessId) {
+                        return "Error: tokenProcessId is required";
+                    }
+
+                    // Fetch user to highlight their own balance if present
+                    const user = await this.userService.getUserByTelegramId(
+                        telegramId.toString()
+                    );
+
+                    const dryrunResult = await this.aoConnect.dryrun({
+                        process: tokenProcessId,
+                        tags: [
+                            { name: "Action", value: "Balances" },
+                            ...(limit ? [{ name: "Limit", value: String(limit) }] : []),
+                            ...(cursor ? [{ name: "Cursor", value: String(cursor) }] : []),
+                        ],
+                        data: "",
+                    });
+
+                    // Expect the first message's Data to contain the balances map
+                    const msg = dryrunResult?.Messages?.[0];
+                    let data: any = undefined;
+                    if (msg?.Data) {
+                        try {
+                            data = typeof msg.Data === "string" ? JSON.parse(msg.Data) : msg.Data;
+                        } catch {}
+                    }
+
+                    if (!data || typeof data !== "object") {
+                        return "No balances found.";
+                    }
+
+                    // If user exists, surface their balance
+                    const userBalance = user?.walletAddress
+                        ? data[user.walletAddress] ?? 0
+                        : undefined;
+
+                    // Build a concise summary (top 10 by balance)
+                    const entries = Object.entries(data) as Array<[string, number]>;
+                    entries.sort((a, b) => (b[1] as number) - (a[1] as number));
+                    const top = entries.slice(0, 10);
+
+                    const lines = top.map(([addr, bal]) =>
+                        `${addr === user?.walletAddress ? "🟢 " : ""}${addr.substring(0, 10)}...: ${bal}`
+                    );
+
+                    let response = "📊 Balances (top 10)\n" + lines.join("\n");
+                    if (user && user.walletAddress) {
+                        response += `\n\nYou (${user.walletAddress.substring(0, 10)}...): ${userBalance ?? 0}`;
+                    }
+                    return response;
+                } catch (error) {
+                    logger.error("List token balances tool error", {
+                        error,
+                        telegramId,
+                    });
+                    return "❌ Error listing balances.";
+                }
+            },
+        });
+    }
+
+    /**
+     * Create the user's balances tool across tracked tokens
+     */
+    private createUserBalancesTool(telegramId: number): DynamicTool {
+        return new DynamicTool({
+            name: "list-my-balances",
+            description:
+                "List the user's balances across configured/tracked token processes. No input required.",
+            func: async () => {
+                try {
+                    return await this.summarizeUserBalances(telegramId);
+                } catch (error) {
+                    logger.error("List my balances tool error", { error, telegramId });
+                    return "❌ Error retrieving balances.";
+                }
+            },
+        });
+    }
+
+    /** Helper to shorten process id */
+    private pidShort(pid: string): string {
+        return `${pid.substring(0, 6)}...${pid.substring(pid.length - 4)}`;
+    }
+
+    /** Build a summary of user's balances across tracked tokens */
+    private async summarizeUserBalances(telegramId: number): Promise<string> {
+        const user = await this.userService.getUserByTelegramId(
+            telegramId.toString()
+        );
+        if (!user || !user.walletAddress) {
+            return "❌ Wallet not found. Please create a wallet first using /start";
+        }
+
+        const tracked = config.ao.trackedTokens || [
+            config.ao.nativeTokenProcessId,
+        ];
+        if (!tracked.length) {
+            return "No tracked tokens configured.";
+        }
+
+        const balances: Array<{ ticker?: string; processId: string; amount: string }>= [];
+
+        for (const pid of tracked) {
+            try {
+                const result = await this.aoConnect.dryrun({
+                    process: pid,
+                    tags: [
+                        { name: "Action", value: "Balance" },
+                        { name: "Target", value: user.walletAddress },
+                    ],
+                    data: "",
+                });
+
+                const msg = result?.Messages?.[0];
+                const amount =
+                    msg?.Data ||
+                    msg?.Tags?.find((t: any) => t.name === "Balance")?.value ||
+                    "0";
+                const ticker = msg?.Tags?.find((t: any) => t.name === "Ticker")?.value;
+                balances.push({ ticker, processId: pid, amount: String(amount) });
+            } catch (e) {
+                logger.warn("Failed to fetch balance for token", { pid, error: e });
+            }
+        }
+
+        if (!balances.length) return "No balances found.";
+
+        const lines = balances.map((b) => {
+            const sym =
+                b.processId === config.ao.nativeTokenProcessId
+                    ? "AO"
+                    : b.ticker || this.pidShort(b.processId);
+            const decimals =
+                b.processId === config.ao.nativeTokenProcessId
+                    ? (config.ao.nativeTokenDecimals ?? 12)
+                    : 0;
+            const pretty = this.formatAmountWithDecimals(b.amount, decimals);
+            return `${sym}: ${pretty}`;
+        });
+        return "💰 Your balances\n" + lines.join("\n");
+    }
+
+    /** Parse transfer request sentences */
+    private parseTransferRequest(text: string):
+        | { amountRaw: string; recipient: string; isAll: boolean }
+        | null {
+        // Patterns:
+        // send 0.11 ao to <addr>
+        // send all my ao to <addr>
+        // transfer 5 ao to <addr>
+        // Capture recipient with case preserved by using a case-insensitive verb but a case-sensitive capture group
+        const allRe = /\b(send|transfer)\s+(all|max)(?:\s+my)?\s+ao\s+to\s+([A-Za-z0-9_-]{20,})/i;
+        const amtRe = /\b(send|transfer)\s+([0-9]+(?:\.[0-9]+)?)\s*ao\s+to\s+([A-Za-z0-9_-]{20,})/i;
+        let m = text.match(allRe);
+        if (m) {
+            return { amountRaw: "all", isAll: true, recipient: m[3] };
+        }
+        m = text.match(amtRe);
+        if (m) {
+            return { amountRaw: m[2], isAll: false, recipient: m[3] };
+        }
+        return null;
+    }
+
+    /** Format token amount by decimals */
+    private formatAmountWithDecimals(amount: string | number, decimals: number): string {
+        try {
+            const big = new (require("big.js")) (amount || 0);
+            if (decimals > 0) {
+                const denom = new (require("big.js")) (10).pow(decimals);
+                const val = big.div(denom);
+                // show up to 6 fractional digits, trim trailing zeros
+                return val.toFixed(6).replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
+            }
+            return big.toString();
+        } catch {
+            return String(amount);
+        }
+    }
+
+    /** Get raw balance (base units) for a process/address */
+    private async getRawBalance(processId: string, address: string): Promise<string> {
+        const res = await this.aoConnect.dryrun({
+            process: processId,
+            tags: [
+                { name: "Action", value: "Balance" },
+                { name: "Target", value: address },
+            ],
+            data: "",
+        });
+        const msg = res?.Messages?.[0];
+        const raw =
+            msg?.Data ||
+            msg?.Tags?.find((t: any) => t.name === "Balance")?.value ||
+            "0";
+        return String(raw);
     }
 
     /**
@@ -291,8 +569,11 @@ export class LangChainService {
      */
     private async createAgent(telegramId: number) {
         const tools = [
-            this.createTransferAssetTool(telegramId),
+            this.createGetWalletAddressTool(telegramId),
             this.createBalanceCheckTool(telegramId),
+            this.createListTokenBalancesTool(telegramId),
+            this.createUserBalancesTool(telegramId),
+            this.createTransferAssetTool(telegramId),
             this.createWalletInfoTool(telegramId),
         ];
 
@@ -302,24 +583,34 @@ export class LangChainService {
                 `You are an AI assistant for an AO (Arweave) token trading bot. You help users manage their AO tokens through natural language commands.
 
 Your capabilities:
+- Get the user's wallet address using the get-wallet-address tool
+- Check a wallet balance using the check-balance tool  
+- List all balances in a token using the list-token-balances tool
 - Transfer AO tokens to other wallet addresses using the transfer-asset tool
-- Check wallet balances using the check-balance tool  
 - Get wallet information using the wallet-info tool
 - Provide information about AO tokens and transactions
 - Help users understand their wallet operations
 
 Available Tools:
-1. **transfer-asset**: For sending tokens to other addresses
+1. **get-wallet-address**: Return the user's wallet address
+   - Use when users ask for their address
+   - Format: no input
+
+2. **check-balance**: Check a wallet balance (Balance action)
+   - Use when users ask about their balance
+   - Format: optional tokenProcessId
+   
+3. **list-token-balances**: List all balances for a token (Balances action)
+   - Use when users ask for all balances/holders of a token
+   - Format: tokenProcessId, optional limit/cursor
+
+4. **list-my-balances**: List user's balances across tracked tokens
+   - Use when users ask "what's my balance" or "what tokens do I hold"
+   - Format: no input required
+
+5. **transfer-asset**: Send tokens (Transfer action)
    - Use when users want to send/transfer tokens
-   - Format: JSON with recipientAddress and amount fields
-   
-2. **check-balance**: For checking wallet balance
-   - Use when users ask about balance, funds, or how much they have
-   - Format: Empty JSON object or with optional tokenProcessId
-   
-3. **wallet-info**: For getting wallet details
-   - Use when users ask about their wallet, address, or account info
-   - Format: Empty JSON object (no parameters needed)
+   - Format: recipientAddress, amount, optional tokenProcessId
 
 Guidelines:
 - Always use the appropriate tool for user requests
@@ -359,6 +650,120 @@ Current user's Telegram ID: ${telegramId}`,
         conversationHistory: ConversationMessage[] = []
     ): Promise<string> {
         try {
+            // Lightweight intent shortcut for common request: wallet address
+            const lower = userMessage.toLowerCase();
+            const normLower = lower.replace(/[’`]/g, "'");
+            const normQuotes = userMessage.replace(/[’`]/g, "'");
+            const asksForAddress =
+                (normLower.includes("wallet") && normLower.includes("address")) ||
+                normLower.includes("my address") ||
+                normLower.includes("what is my address") ||
+                normLower.includes("whats my address") ||
+                normLower.includes("what's my address");
+            const asksForMyBalance =
+                normLower.includes("my balance") ||
+                normLower.includes("what's my balance") ||
+                normLower.includes("whats my balance") ||
+                (normLower.includes("balance") && normLower.includes("my"));
+            const asksForTransfer =
+                normLower.startsWith("send ") ||
+                normLower.startsWith("transfer ") ||
+                normLower.includes(" send ") ||
+                normLower.includes(" transfer ");
+            if (asksForAddress) {
+                const user = await this.userService.getUserByTelegramId(
+                    telegramId.toString()
+                );
+                if (user?.walletAddress) {
+                    return `📍 Your wallet address is:\n\`${user.walletAddress}\``;
+                }
+            }
+            if (asksForMyBalance) {
+                return await this.summarizeUserBalances(telegramId);
+            }
+            if (asksForTransfer) {
+                // Parse from quote-normalized but case-preserving string
+                const parsed = this.parseTransferRequest(normQuotes);
+                if (!parsed) {
+                    return "Please specify an amount and recipient, e.g. 'send 0.1 AO to <address>'.";
+                }
+                const { amountRaw, recipient, isAll } = parsed;
+
+                console.log("[direct-transfer] parsed:", parsed);
+
+                // Execute transfer directly
+                try {
+                    const user = await this.userService.getUserByTelegramId(
+                        telegramId.toString()
+                    );
+                    if (!user || !user.walletAddress || !user.encryptedPrivateKey) {
+                        return "❌ Wallet not found. Please create a wallet first using /start";
+                    }
+
+                    // Decrypt key and build signer
+                    const privateKey = this.encryptionService.decrypt(
+                        user.encryptedPrivateKey
+                    );
+                    const wallet = JSON.parse(privateKey);
+                    const signer = createDataItemSigner(wallet);
+
+                    const processId = config.ao.nativeTokenProcessId;
+
+                    // Determine quantity
+                    let quantity = amountRaw;
+                    if (isAll) {
+                        const bal = await this.getRawBalance(processId, user.walletAddress);
+                        if (bal === "0") return "❌ Insufficient balance.";
+                        quantity = bal;
+                    } else {
+                        const decimals = processId === config.ao.nativeTokenProcessId ? 12 : 0;
+                        if (decimals > 0 && /\./.test(amountRaw)) {
+                            const big = new (require("big.js")) (amountRaw);
+                            const denom = new (require("big.js")) (10).pow(decimals);
+                            quantity = big.times(denom).round(0, 0).toString();
+                        }
+                    }
+
+                    console.log("[direct-transfer] process:", processId);
+                    console.log("[direct-transfer] tags:", {
+                        Action: "Transfer",
+                        Recipient: recipient,
+                        Quantity: quantity,
+                    });
+
+                    const sendRes = await this.aoConnect.message({
+                        process: processId,
+                        tags: [
+                            { name: "Action", value: "Transfer" },
+                            { name: "Recipient", value: recipient },
+                            { name: "Quantity", value: quantity },
+                        ],
+                        signer,
+                        data: "",
+                    });
+                    const messageId = typeof sendRes === "string" ? sendRes : sendRes?.id;
+
+                    console.log("[direct-transfer] messageId:", messageId);
+
+                    // Try to fetch result quickly
+                    await new Promise((r) => setTimeout(r, 1500));
+                    try {
+                        const result = await this.aoConnect.result({
+                            message: messageId,
+                            process: processId,
+                        });
+                        console.log("[direct-transfer] result:", result);
+                    } catch (e) {
+                        console.log("[direct-transfer] result fetch error:", e);
+                    }
+
+                    return `✅ Transfer initiated!\n- Amount: ${isAll ? "ALL" : amountRaw} AO\n- Recipient: ${recipient}\n- TxID: ${messageId}`;
+                } catch (e: any) {
+                    console.error("[direct-transfer] error:", e);
+                    return `❌ Transfer error: ${e?.message || "Unknown error"}`;
+                }
+            }
+
             logger.info("Processing LangChain message", {
                 telegramId,
                 userMessage,
@@ -394,13 +799,12 @@ Current user's Telegram ID: ${telegramId}`,
             logger.info("LangChain response generated", {
                 telegramId,
                 userMessage: userMessage.substring(0, 100),
-                responseLength: result.output?.length || 0,
+                responseLength: (result as any)?.output?.length || 0,
             });
 
-            return (
-                result.output ||
-                "I apologize, but I couldn't process your request. Please try again."
-            );
+            if ((result as any)?.output && typeof (result as any).output === "string")
+                return (result as any).output;
+            return "I apologize, but I couldn't process your request. Please try again.";
         } catch (error) {
             // Log the full error to console for debugging
             console.error("Full LangChain error:", error);
