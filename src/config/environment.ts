@@ -37,6 +37,10 @@ const envSchema = Joi.object({
         "0syT13r0s0tgPmIed95bJnuSqaD29HQNN8D3ElLSrsc"
     ),
     AO_NATIVE_TOKEN_DECIMALS: Joi.number().integer().min(0).default(12),
+    AO_ARIO_TOKEN_PROCESS_ID: Joi.string().default(
+        "qNvAoz0TgcH7DMg8BCVn8jF32QH5L6T29VjHxhHqqGE"
+    ),
+    AO_ARIO_TOKEN_DECIMALS: Joi.number().integer().min(0).default(6),
     AO_TRACKED_TOKENS: Joi.string().allow("").optional(),
 
     // Security Configuration
@@ -96,6 +100,8 @@ export interface Config {
         authorityAddress: string;
         nativeTokenProcessId: string;
         nativeTokenDecimals: number;
+        arioTokenProcessId: string;
+        arioTokenDecimals: number;
         trackedTokens?: string[];
     };
     security: {
@@ -151,6 +157,8 @@ export const config: Config = {
         authorityAddress: envVars.AO_AUTHORITY_ADDRESS,
         nativeTokenProcessId: envVars.AO_NATIVE_TOKEN_PROCESS_ID,
         nativeTokenDecimals: envVars.AO_NATIVE_TOKEN_DECIMALS,
+        arioTokenProcessId: envVars.AO_ARIO_TOKEN_PROCESS_ID,
+        arioTokenDecimals: envVars.AO_ARIO_TOKEN_DECIMALS,
     },
     security: {
         jwtSecret: envVars.JWT_SECRET,

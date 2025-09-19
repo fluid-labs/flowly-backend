@@ -11,6 +11,7 @@ import { config } from "../config/environment";
 import { UserService } from "./userService";
 import { EncryptionService } from "../utils/encryption";
 import { logger } from "../utils/logger";
+import { VentoClient } from "@vela-ventures/vento-sdk";
 
 export interface ConversationMessage {
     role: "user" | "assistant";
@@ -421,12 +422,9 @@ export class LangChainService {
             return "❌ Wallet not found. Please create a wallet first using /start";
         }
 
-        const tracked = config.ao.trackedTokens || [
-            config.ao.nativeTokenProcessId,
-        ];
-        if (!tracked.length) {
-            return "No tracked tokens configured.";
-        }
+        const tracked = (config.ao.trackedTokens && config.ao.trackedTokens.length > 0)
+            ? config.ao.trackedTokens
+            : [config.ao.nativeTokenProcessId, config.ao.arioTokenProcessId].filter(Boolean);
 
         const balances: Array<{ ticker?: string; processId: string; amount: string }>= [];
 
@@ -453,21 +451,136 @@ export class LangChainService {
             }
         }
 
-        if (!balances.length) return "No balances found.";
+        // Filter out zero balances
+        const nonZero = balances.filter((b) => {
+            try {
+                const n = new (require("big.js")) (b.amount || 0);
+                return n.gt(0);
+            } catch { return String(b.amount) !== "0"; }
+        });
 
-        const lines = balances.map((b) => {
+        if (!nonZero.length) return "No balances found.";
+
+        const lines = nonZero.map((b) => {
             const sym =
                 b.processId === config.ao.nativeTokenProcessId
                     ? "AO"
                     : b.ticker || this.pidShort(b.processId);
-            const decimals =
-                b.processId === config.ao.nativeTokenProcessId
-                    ? (config.ao.nativeTokenDecimals ?? 12)
-                    : 0;
+            const decimals = this.getKnownTokenDecimals(b.processId);
             const pretty = this.formatAmountWithDecimals(b.amount, decimals);
             return `${sym}: ${pretty}`;
         });
         return "💰 Your balances\n" + lines.join("\n");
+    }
+
+    private getKnownTokenDecimals(processId: string): number {
+        if (processId === config.ao.nativeTokenProcessId)
+            return config.ao.nativeTokenDecimals ?? 12;
+        if (processId === config.ao.arioTokenProcessId)
+            return config.ao.arioTokenDecimals ?? 6;
+        return 0;
+    }
+
+    private async listBalancesForProcess(telegramId: number, tokenProcessId: string): Promise<string> {
+        try {
+            const user = await this.userService.getUserByTelegramId(telegramId.toString());
+            const dryrunResult = await this.aoConnect.dryrun({
+                process: tokenProcessId,
+                tags: [
+                    { name: "Action", value: "Balances" },
+                    { name: "Limit", value: String(1000) },
+                ],
+                data: "",
+            });
+            const msg = dryrunResult?.Messages?.[0];
+            let data: any = undefined;
+            if (msg?.Data) {
+                try { data = typeof msg.Data === "string" ? JSON.parse(msg.Data) : msg.Data; } catch {}
+            }
+            if (!data || typeof data !== "object") return "No balances found.";
+            const entries = Object.entries(data) as Array<[string, number]>;
+            entries.sort((a, b) => (b[1] as number) - (a[1] as number));
+            const top = entries.slice(0, 10);
+            const lines = top.map(([addr, bal]) => `${addr === user?.walletAddress ? "🟢 " : ""}${addr.substring(0, 10)}...: ${bal}`);
+            let response = "📊 Balances (top 10)\n" + lines.join("\n");
+            if (user?.walletAddress) {
+                const mine = data[user.walletAddress] ?? 0;
+                response += `\n\nYou (${user.walletAddress.substring(0, 10)}...): ${mine}`;
+            }
+            return response;
+        } catch (error) {
+            logger.error("listBalancesForProcess error", { error, telegramId, tokenProcessId });
+            return "❌ Error fetching balances for token.";
+        }
+    }
+
+    private parseSpecificBalanceRequest(text: string): string | null {
+        // e.g., what's my ARIO balance, what is my ao balance
+        const re = /(what'?s|what\s+is)\s+my\s+([a-z0-9_-]{2,})\s+balance/i;
+        const m = text.match(re);
+        if (!m) return null;
+        const alias = m[2].toUpperCase();
+        if (alias === "AO" || alias === "ARIO") return alias;
+        return alias;
+    }
+
+    private resolveTokenIdByAlias(alias: string): string | null {
+        const map: Record<string, string> = {
+            AO: config.ao.nativeTokenProcessId,
+            ARIO: config.ao.arioTokenProcessId,
+        };
+        return map[alias.toUpperCase()] || null;
+    }
+
+    private getDecimalsByAliasOrId(token: string): number {
+        if (token.toUpperCase() === "AO" || token === config.ao.nativeTokenProcessId) {
+            return config.ao.nativeTokenDecimals ?? 12;
+        }
+        if (token.toUpperCase() === "ARIO" || token === config.ao.arioTokenProcessId) {
+            return config.ao.arioTokenDecimals ?? 6;
+        }
+        return 0;
+    }
+
+    private async getFormattedUserBalanceForToken(
+        telegramId: number,
+        tokenAliasOrId: string
+    ): Promise<string> {
+        try {
+            const user = await this.userService.getUserByTelegramId(
+                telegramId.toString()
+            );
+            if (!user?.walletAddress) {
+                return "❌ Wallet not found. Please create a wallet first using /start";
+            }
+
+            const tokenId =
+                this.resolveTokenIdByAlias(tokenAliasOrId) || tokenAliasOrId;
+            const result = await this.aoConnect.dryrun({
+                process: tokenId,
+                tags: [
+                    { name: "Action", value: "Balance" },
+                    { name: "Target", value: user.walletAddress },
+                ],
+                data: "",
+            });
+            const msg = result?.Messages?.[0];
+            const raw =
+                msg?.Data ||
+                msg?.Tags?.find((t: any) => t.name === "Balance")?.value ||
+                "0";
+            const decimals = this.getDecimalsByAliasOrId(tokenId);
+            const pretty = this.formatAmountWithDecimals(raw, decimals);
+            const sym = tokenAliasOrId.toUpperCase() === tokenId ? this.pidShort(tokenId) : tokenAliasOrId.toUpperCase();
+            return `💰 ${sym} Balance\n${pretty} ${sym}`;
+        } catch (error) {
+            logger.error("getFormattedUserBalanceForToken error", {
+                error,
+                telegramId,
+                tokenAliasOrId,
+            });
+            return "❌ Error fetching token balance.";
+        }
     }
 
     /** Parse transfer request sentences */
@@ -575,6 +688,7 @@ export class LangChainService {
             this.createUserBalancesTool(telegramId),
             this.createTransferAssetTool(telegramId),
             this.createWalletInfoTool(telegramId),
+            this.createSwapTokensTool(telegramId),
         ];
 
         const prompt = ChatPromptTemplate.fromMessages([
@@ -670,6 +784,11 @@ Current user's Telegram ID: ${telegramId}`,
                 normLower.startsWith("transfer ") ||
                 normLower.includes(" send ") ||
                 normLower.includes(" transfer ");
+            const asksForSwap =
+                normLower.startsWith("swap ") ||
+                normLower.includes(" swap ");
+            const listBalancesForTokenMatch = normQuotes.match(/\b(list\s+balances\s+for|holders\s+for)\s+([A-Za-z0-9_-]{20,})/i);
+            const specificTokenBalanceAlias = this.parseSpecificBalanceRequest(normQuotes);
             if (asksForAddress) {
                 const user = await this.userService.getUserByTelegramId(
                     telegramId.toString()
@@ -678,8 +797,18 @@ Current user's Telegram ID: ${telegramId}`,
                     return `📍 Your wallet address is:\n\`${user.walletAddress}\``;
                 }
             }
+            if (specificTokenBalanceAlias) {
+                return await this.getFormattedUserBalanceForToken(
+                    telegramId,
+                    specificTokenBalanceAlias
+                );
+            }
             if (asksForMyBalance) {
                 return await this.summarizeUserBalances(telegramId);
+            }
+            if (listBalancesForTokenMatch) {
+                const tokenProcessId = listBalancesForTokenMatch[2];
+                return await this.listBalancesForProcess(telegramId, tokenProcessId);
             }
             if (asksForTransfer) {
                 // Parse from quote-normalized but case-preserving string
@@ -761,6 +890,82 @@ Current user's Telegram ID: ${telegramId}`,
                 } catch (e: any) {
                     console.error("[direct-transfer] error:", e);
                     return `❌ Transfer error: ${e?.message || "Unknown error"}`;
+                }
+            }
+
+            if (asksForSwap) {
+                const parsed = this.parseSwapRequest(normQuotes);
+                if (!parsed) {
+                    return "Please specify swap like 'swap 0.1 AO to ARIO'";
+                }
+                const { amountRaw, fromSymbol, toSymbol } = parsed;
+                console.log("[direct-swap] parsed:", parsed);
+                try {
+                    const user = await this.userService.getUserByTelegramId(
+                        telegramId.toString()
+                    );
+                    if (!user || !user.walletAddress || !user.encryptedPrivateKey) {
+                        return "❌ Wallet not found. Please create a wallet first using /start";
+                    }
+                    const privateKey = this.encryptionService.decrypt(
+                        user.encryptedPrivateKey
+                    );
+                    const wallet = JSON.parse(privateKey);
+                    const signer = createDataItemSigner(wallet);
+
+                    const client = new VentoClient({ signer });
+
+                    const tokenIdMap: Record<string, string> = {
+                        AO: config.ao.nativeTokenProcessId,
+                        ARIO: config.ao.arioTokenProcessId,
+                    };
+                    const fromTokenId = tokenIdMap[fromSymbol.toUpperCase()] || fromSymbol;
+                    const toTokenId = tokenIdMap[toSymbol.toUpperCase()] || toSymbol;
+
+                    // Convert display amount to base units (assume AO 12 decimals; others 0 unless SDK expects otherwise)
+                    const decimals = fromTokenId === config.ao.nativeTokenProcessId ? 12 : 0;
+                    const big = new (require("big.js")) (amountRaw);
+                    const denom = new (require("big.js")) (10).pow(decimals);
+                    const amountBase = big.times(denom).round(0, 0).toString();
+
+                    console.log("[direct-swap] quoting:", {
+                        fromTokenId,
+                        toTokenId,
+                        amountBase,
+                        userAddress: user.walletAddress,
+                    });
+
+                    const quote = await client.getSwapQuote({
+                        fromTokenId,
+                        toTokenId,
+                        amount: amountBase,
+                        userAddress: user.walletAddress,
+                    });
+
+                    if (!quote?.bestRoute) {
+                        return "❌ No swap route found for requested pair/amount.";
+                    }
+
+                    const minAmount = VentoClient.calculateMinAmount(
+                        quote.bestRoute.estimatedOutput,
+                        1
+                    );
+
+                    const result = await client.executeSwap(
+                        quote.bestRoute,
+                        quote.fromTokenId,
+                        quote.toTokenId,
+                        quote.inputAmount,
+                        minAmount,
+                        user.walletAddress
+                    );
+
+                    console.log("[direct-swap] result:", result);
+
+                    return `🔄 Swap submitted!\n- From: ${amountRaw} ${fromSymbol.toUpperCase()}\n- To: ${toSymbol.toUpperCase()}\n- Message: ${result.messageId || "submitted"}`;
+                } catch (e: any) {
+                    console.error("[direct-swap] error:", e);
+                    return `❌ Swap error: ${e?.message || "Unknown error"}`;
                 }
             }
 
@@ -884,5 +1089,86 @@ Current user's Telegram ID: ${telegramId}`,
             logger.error("Error getting wallet balance", { error, telegramId });
             return "Error retrieving balance";
         }
+    }
+
+    private createSwapTokensTool(telegramId: number): DynamicTool {
+        return new DynamicTool({
+            name: "swap-tokens",
+            description:
+                "Swap tokens using Vento. Input: { fromSymbol|fromTokenId, toSymbol|toTokenId, amount }",
+            func: async (input: string) => {
+                try {
+                    const args = JSON.parse(input || "{}");
+                    const amountRaw: string = String(args.amount);
+                    const from = (args.fromSymbol || args.fromTokenId || "AO").toString();
+                    const to = (args.toSymbol || args.toTokenId || "ARIO").toString();
+
+                    const user = await this.userService.getUserByTelegramId(
+                        telegramId.toString()
+                    );
+                    if (!user || !user.walletAddress || !user.encryptedPrivateKey) {
+                        return "❌ Wallet not found. Please create a wallet first using /start";
+                    }
+
+                    const privateKey = this.encryptionService.decrypt(
+                        user.encryptedPrivateKey
+                    );
+                    const wallet = JSON.parse(privateKey);
+                    const signer = createDataItemSigner(wallet);
+
+                    const client = new VentoClient({ signer });
+
+                    const tokenIdMap: Record<string, string> = {
+                        AO: config.ao.nativeTokenProcessId,
+                        ARIO: config.ao.arioTokenProcessId,
+                    };
+                    const fromTokenId = tokenIdMap[from.toUpperCase()] || from;
+                    const toTokenId = tokenIdMap[to.toUpperCase()] || to;
+
+                    const decimals = fromTokenId === config.ao.nativeTokenProcessId ? 12 : 0;
+                    const big = new (require("big.js")) (amountRaw);
+                    const denom = new (require("big.js")) (10).pow(decimals);
+                    const amountBase = big.times(denom).round(0, 0).toString();
+
+                    const quote = await client.getSwapQuote({
+                        fromTokenId,
+                        toTokenId,
+                        amount: amountBase,
+                        userAddress: user.walletAddress,
+                    });
+                    if (!quote?.bestRoute) {
+                        return "❌ No swap route found for requested pair/amount.";
+                    }
+                    const minAmount = VentoClient.calculateMinAmount(
+                        quote.bestRoute.estimatedOutput,
+                        1
+                    );
+                    const result = await client.executeSwap(
+                        quote.bestRoute,
+                        quote.fromTokenId,
+                        quote.toTokenId,
+                        quote.inputAmount,
+                        minAmount,
+                        user.walletAddress
+                    );
+                    return `✅ Swap initiated!\n- From: ${amountRaw} ${from.toUpperCase()}\n- To: ${to.toUpperCase()}\n- Message: ${result.messageId || "submitted"}`;
+                } catch (error) {
+                    logger.error("swap-tokens tool error", { error, telegramId });
+                    return `❌ Swap tool error: ${
+                        error instanceof Error ? error.message : "Unknown error"
+                    }`;
+                }
+            },
+        });
+    }
+
+    private parseSwapRequest(text: string):
+        | { amountRaw: string; fromSymbol: string; toSymbol: string }
+        | null {
+        // swap 0.1 ao to ario
+        const re = /\bswap\s+([0-9]+(?:\.[0-9]+)?)\s+([a-z0-9_-]{2,})\s+to\s+([a-z0-9_-]{2,})/i;
+        const m = text.match(re);
+        if (!m) return null;
+        return { amountRaw: m[1], fromSymbol: m[2], toSymbol: m[3] };
     }
 }

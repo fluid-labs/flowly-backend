@@ -30,6 +30,7 @@
         "@langchain/openai": "^0.6.12",
         "@permaweb/aoconnect": "^0.0.57",
         "@prisma/client": "^5.7.1",
+        "@vela-ventures/vento-sdk": "^1.1.2",
         "arweave": "^1.14.4",
         "bcryptjs": "^2.4.3",
         "big.js": "^6.2.1",
