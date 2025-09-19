@@ -28,9 +28,10 @@
     "dependencies": {
         "@langchain/core": "^0.3.76",
         "@langchain/openai": "^0.6.12",
-        "@permaweb/aoconnect": "^0.0.57",
+        "@permaweb/aoconnect": "^0.0.90",
         "@prisma/client": "^5.7.1",
         "@vela-ventures/vento-sdk": "^1.1.2",
+        "ao-tokens": "^0.0.6",
         "arweave": "^1.14.4",
         "bcryptjs": "^2.4.3",
         "big.js": "^6.2.1",
@@ -40,10 +41,12 @@
         "helmet": "^7.1.0",
         "joi": "^17.11.0",
         "langchain": "^0.3.34",
+        "liquidops": "^1.2.28",
         "module-alias": "^2.2.3",
         "node-cron": "^3.0.3",
         "rate-limiter-flexible": "^4.0.1",
         "telegraf": "^4.15.6",
+        "warp-arbundles": "^1.0.4",
         "winston": "^3.11.0"
     },
     "devDependencies": {

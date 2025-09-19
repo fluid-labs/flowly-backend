@@ -57,7 +57,8 @@ export class AOWalletService {
         });
 
         // Initialize AO Connect with custom configuration
-        this.aoConnect = connect({
+        this.aoConnect = (connect as any)({
+            MODE: "legacy",
             MU_URL: config.ao.muUrl,
             CU_URL: config.ao.cuUrl,
             GATEWAY_URL: config.ao.gatewayUrl,

@@ -23,6 +23,7 @@ export interface TransferAssetParams {
     recipientAddress: string;
     amount: string;
     tokenProcessId?: string;
+    tokenSymbol?: string;
 }
 
 export class LangChainService {
@@ -30,6 +31,20 @@ export class LangChainService {
     private userService: UserService;
     private encryptionService: EncryptionService;
     private aoConnect: any;
+    private tokenDecimalsCache: Map<string, number> = new Map();
+    private readonly SUPPORTED_TOKENS: Record<string, string> = {
+        AO: config.ao.nativeTokenProcessId,
+        ARIO: config.ao.arioTokenProcessId,
+        WAR: "xU9zFkq3X2ZQ6olwNVvr1vUWIjc3kXTWr7xKQD6dh10",
+        WUSDC: "7zH9dlMNoxprab9loshv3Y7WG45DOny_Vrq9KrXObdQ",
+        WUSDT: "7j3jUyFpTuepg_uu_sJnwLE6KiTVuA9cLrkfOp2MFlo",
+        WETH: "cBgS-V_yGhOe9P1wCIuNSgDA_JS8l4sE5iFcPTr0TD0",
+        USDA: "FBt9A5GA_KXMMSxA2DJ0xZbAq8sLLU2ak-YJe9zDvg8",
+        VAR: "y-p7CPhs6JMUStAuE4KeTnMXN7qYBvEi2hiBFk8ZhjM",
+        VUSDC: "cxkFiGP89fEKOvbvl9SLs1lEaw0L-DWJiqQOuDPeDG8",
+        VDAI: "Q5Qk5W_AOUou2nRu1RlEpfr8yzKmWJ98tQb8QEyYqx4",
+        VETH: "SGUZMZ1toA4k5wlDNyDtHQThf1SEAOLNwiE8TzsnSgw",
+    };
 
     constructor() {
         this.llm = new ChatOpenAI({
@@ -42,7 +57,8 @@ export class LangChainService {
         this.encryptionService = new EncryptionService();
 
         // Initialize AO Connect with configured endpoints
-        this.aoConnect = connect({
+        this.aoConnect = (connect as any)({
+            MODE: "legacy",
             MU_URL: config.ao.muUrl,
             CU_URL: config.ao.cuUrl,
             GATEWAY_URL: config.ao.gatewayUrl,
@@ -55,11 +71,12 @@ export class LangChainService {
     private createTransferAssetTool(telegramId: number): DynamicTool {
         return new DynamicTool({
             name: "transfer-asset",
-            description: `Transfer AO tokens to another wallet address. 
+            description: `Transfer tokens to another wallet address on AO. 
             Input should be a JSON object with:
             - recipientAddress: The wallet address to send tokens to (required)
-            - amount: The amount of tokens to send (required, as string)
-            - tokenProcessId: The AO token process ID (optional, defaults to AO native token)`,
+            - amount: The amount to send (required, as string; supports 'all'/'max')
+            - tokenSymbol: Optional symbol (e.g., 'AO', 'USDA'); takes precedence over tokenProcessId
+            - tokenProcessId: Optional token process ID (used if tokenSymbol not provided)`,
             func: async (input: string) => {
                 try {
                     const params: TransferAssetParams = JSON.parse(input);
@@ -95,9 +112,19 @@ export class LangChainService {
                     // Create signer
                     const signer = createDataItemSigner(wallet);
 
-                    // Default AO token process ID (configurable)
-                    const processId =
-                        params.tokenProcessId || config.ao.nativeTokenProcessId;
+                    // Resolve token process ID from symbol or explicit ID
+                    let processId: string | undefined;
+                    if (params.tokenSymbol) {
+                        const sym = params.tokenSymbol.toUpperCase();
+                        processId = this.SUPPORTED_TOKENS[sym];
+                    } else if (params.tokenProcessId) {
+                        processId = params.tokenProcessId;
+                    } else {
+                        processId = config.ao.nativeTokenProcessId;
+                    }
+                    if (!processId) {
+                        return "❌ Token not supported.";
+                    }
 
                     // Determine quantity in base units
                     const amtRaw = params.amount.trim();
@@ -114,14 +141,11 @@ export class LangChainService {
                         }
                         quantity = bal;
                     } else {
-                        // If decimal provided, convert to base units for native AO
-                        const decimals =
-                            processId === config.ao.nativeTokenProcessId ? 12 : 0;
-                        if (decimals > 0 && /\./.test(amtRaw)) {
-                            const big = new (require("big.js")) (amtRaw);
-                            const denom = new (require("big.js")) (10).pow(decimals);
-                            quantity = big.times(denom).round(0, 0).toString();
-                        }
+                        // Convert display amount to base units for token (always apply decimals)
+                        const decimals = this.getDecimalsByAliasOrId(processId);
+                        const big = new (require("big.js")) (amtRaw);
+                        const denom = new (require("big.js")) (10).pow(decimals);
+                        quantity = big.times(denom).round(0, 0).toString();
                     }
 
                     // Send transfer message to AO process
@@ -171,13 +195,15 @@ export class LangChainService {
 
                         console.log("[transfer-asset] result:", result);
 
-                        return `✅ Transfer initiated!\n- Amount: ${params.amount} AO\n- Recipient: ${params.recipientAddress}\n- TxID: ${messageId}\n- Status: ${result.Output || "Submitted"}`;
+                        const sym = params.tokenSymbol?.toUpperCase() || (Object.entries(this.SUPPORTED_TOKENS).find(([, id]) => id === processId)?.[0] || "TOKENS");
+                        return `✅ Transfer initiated!\n- Amount: ${params.amount} ${sym}\n- Recipient: \`${params.recipientAddress}\`\n- TxID: \`${messageId}\`\n- Status: ${result.Output || "Submitted"}`;
                     } catch (resultError) {
                         logger.warn(
                             "Could not fetch transfer result immediately",
                             { error: resultError }
                         );
-                        return `🔄 Transfer initiated successfully!\n- Amount: ${params.amount} AO\n- Recipient: ${params.recipientAddress}\n- TxID: ${messageId}\n- Status: Processing`;
+                        const sym = params.tokenSymbol?.toUpperCase() || (Object.entries(this.SUPPORTED_TOKENS).find(([, id]) => id === processId)?.[0] || "TOKENS");
+                        return `🔄 Transfer initiated successfully!\n- Amount: ${params.amount} ${sym}\n- Recipient: \`${params.recipientAddress}\`\n- TxID: \`${messageId}\`\n- Status: Processing`;
                     }
                 } catch (error) {
                     logger.error("Transfer asset tool error", {
@@ -424,7 +450,7 @@ export class LangChainService {
 
         const tracked = (config.ao.trackedTokens && config.ao.trackedTokens.length > 0)
             ? config.ao.trackedTokens
-            : [config.ao.nativeTokenProcessId, config.ao.arioTokenProcessId].filter(Boolean);
+            : Array.from(new Set(Object.values(this.SUPPORTED_TOKENS).filter(Boolean)));
 
         const balances: Array<{ ticker?: string; processId: string; amount: string }>= [];
 
@@ -474,11 +500,7 @@ export class LangChainService {
     }
 
     private getKnownTokenDecimals(processId: string): number {
-        if (processId === config.ao.nativeTokenProcessId)
-            return config.ao.nativeTokenDecimals ?? 12;
-        if (processId === config.ao.arioTokenProcessId)
-            return config.ao.arioTokenDecimals ?? 6;
-        return 0;
+        return this.getDecimalsByAliasOrId(processId);
     }
 
     private async listBalancesForProcess(telegramId: number, tokenProcessId: string): Promise<string> {
@@ -525,19 +547,32 @@ export class LangChainService {
     }
 
     private resolveTokenIdByAlias(alias: string): string | null {
-        const map: Record<string, string> = {
-            AO: config.ao.nativeTokenProcessId,
-            ARIO: config.ao.arioTokenProcessId,
-        };
-        return map[alias.toUpperCase()] || null;
+        return this.SUPPORTED_TOKENS[alias.toUpperCase()] || null;
     }
 
     private getDecimalsByAliasOrId(token: string): number {
-        if (token.toUpperCase() === "AO" || token === config.ao.nativeTokenProcessId) {
-            return config.ao.nativeTokenDecimals ?? 12;
+        const upper = token.toUpperCase();
+        const aliasToDecimals: Record<string, number> = {
+            AO: config.ao.nativeTokenDecimals ?? 12,
+            ARIO: config.ao.arioTokenDecimals ?? 6,
+            WETH: 18,
+            VETH: 18,
+            WAR: 12,
+            WUSDC: 12,
+            WUSDT: 12,
+            USDA: 12,
+            VAR: 12,
+            VUSDC: 12,
+            VDAI: 12,
+        };
+
+        if (this.SUPPORTED_TOKENS[upper]) {
+            return aliasToDecimals[upper] ?? 6;
         }
-        if (token.toUpperCase() === "ARIO" || token === config.ao.arioTokenProcessId) {
-            return config.ao.arioTokenDecimals ?? 6;
+        const entry = Object.entries(this.SUPPORTED_TOKENS).find(([, id]) => id === token);
+        if (entry) {
+            const [alias] = entry;
+            return aliasToDecimals[alias] ?? 6;
         }
         return 0;
     }
@@ -569,7 +604,8 @@ export class LangChainService {
                 msg?.Data ||
                 msg?.Tags?.find((t: any) => t.name === "Balance")?.value ||
                 "0";
-            const decimals = this.getDecimalsByAliasOrId(tokenId);
+            const decimals = this.getDecimalsByAliasOrId(tokenAliasOrId) || this.getDecimalsByAliasOrId(tokenId);
+            console.log("[specific-balance] token:", tokenAliasOrId, "tokenId:", tokenId, "raw:", raw, "decimals:", decimals);
             const pretty = this.formatAmountWithDecimals(raw, decimals);
             const sym = tokenAliasOrId.toUpperCase() === tokenId ? this.pidShort(tokenId) : tokenAliasOrId.toUpperCase();
             return `💰 ${sym} Balance\n${pretty} ${sym}`;
@@ -585,22 +621,22 @@ export class LangChainService {
 
     /** Parse transfer request sentences */
     private parseTransferRequest(text: string):
-        | { amountRaw: string; recipient: string; isAll: boolean }
+        | { amountRaw: string; recipient: string; isAll: boolean; tokenSymbol?: string }
         | null {
         // Patterns:
         // send 0.11 ao to <addr>
         // send all my ao to <addr>
         // transfer 5 ao to <addr>
-        // Capture recipient with case preserved by using a case-insensitive verb but a case-sensitive capture group
-        const allRe = /\b(send|transfer)\s+(all|max)(?:\s+my)?\s+ao\s+to\s+([A-Za-z0-9_-]{20,})/i;
-        const amtRe = /\b(send|transfer)\s+([0-9]+(?:\.[0-9]+)?)\s*ao\s+to\s+([A-Za-z0-9_-]{20,})/i;
+        // Capture token symbol and recipient with case preserved
+        const allRe = /\b(send|transfer)\s+(all|max)(?:\s+my)?\s+([a-z0-9_-]{2,})(?:\s+tokens?)?\s+to\s+([A-Za-z0-9_-]{20,})/i;
+        const amtRe = /\b(send|transfer)\s+([0-9]+(?:\.[0-9]+)?)\s*([a-z0-9_-]{2,})(?:\s+tokens?)?\s+to\s+([A-Za-z0-9_-]{20,})/i;
         let m = text.match(allRe);
         if (m) {
-            return { amountRaw: "all", isAll: true, recipient: m[3] };
+            return { amountRaw: "all", isAll: true, tokenSymbol: m[3], recipient: m[4] };
         }
         m = text.match(amtRe);
         if (m) {
-            return { amountRaw: m[2], isAll: false, recipient: m[3] };
+            return { amountRaw: m[2], isAll: false, tokenSymbol: m[3], recipient: m[4] };
         }
         return null;
     }
@@ -814,9 +850,9 @@ Current user's Telegram ID: ${telegramId}`,
                 // Parse from quote-normalized but case-preserving string
                 const parsed = this.parseTransferRequest(normQuotes);
                 if (!parsed) {
-                    return "Please specify an amount and recipient, e.g. 'send 0.1 AO to <address>'.";
+                    return "Please specify an amount, token, and recipient. Example: 'send 0.1 AO to <address>' or 'send all USDA to <address>'.";
                 }
-                const { amountRaw, recipient, isAll } = parsed;
+                const { amountRaw, recipient, isAll, tokenSymbol } = parsed;
 
                 console.log("[direct-transfer] parsed:", parsed);
 
@@ -836,7 +872,13 @@ Current user's Telegram ID: ${telegramId}`,
                     const wallet = JSON.parse(privateKey);
                     const signer = createDataItemSigner(wallet);
 
-                    const processId = config.ao.nativeTokenProcessId;
+                    // Resolve token
+                    const processId = tokenSymbol
+                        ? this.SUPPORTED_TOKENS[tokenSymbol.toUpperCase()]
+                        : config.ao.nativeTokenProcessId;
+                    if (!processId) {
+                        return "❌ Token not supported.";
+                    }
 
                     // Determine quantity
                     let quantity = amountRaw;
@@ -845,7 +887,7 @@ Current user's Telegram ID: ${telegramId}`,
                         if (bal === "0") return "❌ Insufficient balance.";
                         quantity = bal;
                     } else {
-                        const decimals = processId === config.ao.nativeTokenProcessId ? 12 : 0;
+                        const decimals = this.getDecimalsByAliasOrId(processId);
                         if (decimals > 0 && /\./.test(amountRaw)) {
                             const big = new (require("big.js")) (amountRaw);
                             const denom = new (require("big.js")) (10).pow(decimals);
@@ -886,7 +928,8 @@ Current user's Telegram ID: ${telegramId}`,
                         console.log("[direct-transfer] result fetch error:", e);
                     }
 
-                    return `✅ Transfer initiated!\n- Amount: ${isAll ? "ALL" : amountRaw} AO\n- Recipient: ${recipient}\n- TxID: ${messageId}`;
+                    const sym = tokenSymbol?.toUpperCase() || (Object.entries(this.SUPPORTED_TOKENS).find(([, id]) => id === processId)?.[0] || "TOKENS");
+                    return `✅ Transfer initiated!\n- Amount: ${isAll ? "ALL" : amountRaw} ${sym}\n- Recipient: \`${recipient}\`\n- TxID: \`${messageId}\``;
                 } catch (e: any) {
                     console.error("[direct-transfer] error:", e);
                     return `❌ Transfer error: ${e?.message || "Unknown error"}`;
@@ -915,15 +958,14 @@ Current user's Telegram ID: ${telegramId}`,
 
                     const client = new VentoClient({ signer });
 
-                    const tokenIdMap: Record<string, string> = {
-                        AO: config.ao.nativeTokenProcessId,
-                        ARIO: config.ao.arioTokenProcessId,
-                    };
-                    const fromTokenId = tokenIdMap[fromSymbol.toUpperCase()] || fromSymbol;
-                    const toTokenId = tokenIdMap[toSymbol.toUpperCase()] || toSymbol;
+            const fromTokenId = this.SUPPORTED_TOKENS[fromSymbol.toUpperCase()];
+            const toTokenId = this.SUPPORTED_TOKENS[toSymbol.toUpperCase()];
+            if (!fromTokenId || !toTokenId) {
+                return "❌ Token not supported. Supported: AO, ARIO, WAR, WUSDC, WUSDT, WETH, USDA, VAR, VUSDC, VDAI, VETH";
+            }
 
-                    // Convert display amount to base units (assume AO 12 decimals; others 0 unless SDK expects otherwise)
-                    const decimals = fromTokenId === config.ao.nativeTokenProcessId ? 12 : 0;
+                    // Convert display amount to base units based on token decimals
+                    const decimals = this.getDecimalsByAliasOrId(fromTokenId);
                     const big = new (require("big.js")) (amountRaw);
                     const denom = new (require("big.js")) (10).pow(decimals);
                     const amountBase = big.times(denom).round(0, 0).toString();
@@ -1118,14 +1160,13 @@ Current user's Telegram ID: ${telegramId}`,
 
                     const client = new VentoClient({ signer });
 
-                    const tokenIdMap: Record<string, string> = {
-                        AO: config.ao.nativeTokenProcessId,
-                        ARIO: config.ao.arioTokenProcessId,
-                    };
-                    const fromTokenId = tokenIdMap[from.toUpperCase()] || from;
-                    const toTokenId = tokenIdMap[to.toUpperCase()] || to;
+            const fromTokenId = this.SUPPORTED_TOKENS[from.toUpperCase()];
+            const toTokenId = this.SUPPORTED_TOKENS[to.toUpperCase()];
+            if (!fromTokenId || !toTokenId) {
+                return "❌ Token not supported. Supported: AO, ARIO, WAR, WUSDC, WUSDT, WETH, USDA, VAR, VUSDC, VDAI, VETH";
+            }
 
-                    const decimals = fromTokenId === config.ao.nativeTokenProcessId ? 12 : 0;
+                    const decimals = this.getDecimalsByAliasOrId(fromTokenId);
                     const big = new (require("big.js")) (amountRaw);
                     const denom = new (require("big.js")) (10).pow(decimals);
                     const amountBase = big.times(denom).round(0, 0).toString();

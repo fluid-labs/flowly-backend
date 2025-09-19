@@ -15,14 +15,17 @@ importers:
         specifier: ^0.6.12
         version: 0.6.13(@langchain/core@0.3.77(openai@5.12.2(zod@3.25.76)))
       '@permaweb/aoconnect':
-        specifier: ^0.0.57
-        version: 0.0.57
+        specifier: ^0.0.90
+        version: 0.0.90
       '@prisma/client':
         specifier: ^5.7.1
         version: 5.22.0(prisma@5.22.0)
       '@vela-ventures/vento-sdk':
         specifier: ^1.1.2
-        version: 1.1.2(@permaweb/aoconnect@0.0.57)(ethers@6.15.0)
+        version: 1.1.2(@permaweb/aoconnect@0.0.90)(ethers@6.15.0)
+      ao-tokens:
+        specifier: ^0.0.6
+        version: 0.0.6(@permaweb/aoconnect@0.0.90)
       arweave:
         specifier: ^1.14.4
         version: 1.15.7
@@ -49,7 +52,10 @@ importers:
         version: 17.13.3
       langchain:
         specifier: ^0.3.34
-        version: 0.3.34(@langchain/core@0.3.77(openai@5.12.2(zod@3.25.76)))(handlebars@4.7.8)(openai@5.12.2(zod@3.25.76))
+        version: 0.3.34(@langchain/core@0.3.77(openai@5.12.2(zod@3.25.76)))(axios@1.12.2)(handlebars@4.7.8)(openai@5.12.2(zod@3.25.76))
+      liquidops:
+        specifier: ^1.2.28
+        version: 1.2.28(@permaweb/aoconnect@0.0.90)(ao-tokens@0.0.6(@permaweb/aoconnect@0.0.90))(arweave@1.15.7)(warp-arbundles@1.0.4)
       module-alias:
         specifier: ^2.2.3
         version: 2.2.3
@@ -62,6 +68,9 @@ importers:
       telegraf:
         specifier: ^4.15.6
         version: 4.16.3
+      warp-arbundles:
+        specifier: ^1.0.4
+        version: 1.0.4
       winston:
         specifier: ^3.11.0
         version: 3.17.0
@@ -293,6 +302,9 @@ packages:
   '@dabh/diagnostics@2.0.3':
     resolution: {integrity: sha512-hrlQOIi7hAfzsMqlGSFyVucrx38O+j6wiGOf//H2ecvIEqYN4ADBSS2iLMh5UFyDunCNniUIPk/q3riFv45xRA==}
 
+  '@dha-team/arbundles@1.0.3':
+    resolution: {integrity: sha512-/XelOo5V/1o1M8VchCQ+F7N5kxwirWh5jD5zg1KECaV80Qld6aKBSgG19VLlBsRUXbRUfjM+LDRPJm9Hjfmycg==}
+
   '@dha-team/arbundles@1.0.4':
     resolution: {integrity: sha512-T/4pv6bosp4caV32EubHTqDzLAqL6481Bsqd348JO0h+HSaMysloY/pFSLwZf9U3IvkJngIZ4njrYQUkjSkkwA==}
 
@@ -426,6 +438,9 @@ packages:
   '@humanwhocodes/object-schema@2.0.3':
     resolution: {integrity: sha512-93zYdMES/c1D69yZiKDBj0V24vqNzB/koF26KPaagAfd3P/4gUlh3Dys5ogAK+Exi9QyzlD8x/08Zt7wIKcDcA==}
     deprecated: Use @eslint/object-schema instead
+
+  '@irys/arweave@0.0.2':
+    resolution: {integrity: sha512-ddE5h4qXbl0xfGlxrtBIwzflaxZUDlDs43TuT0u1OMfyobHul4AA1VEX72Rpzw2bOh4vzoytSqA1jCM7x9YtHg==}
 
   '@istanbuljs/load-nyc-config@1.1.0':
     resolution: {integrity: sha512-VjeHSlIzpv/NyD3N0YuHfXOPDIixcA1q2ZV98wsMqcYlPmv2n3Yb2lYP9XMElnaFVXg5A7YLTeLu6V84uQDjmQ==}
@@ -562,9 +577,12 @@ packages:
     resolution: {integrity: sha512-tzuNsy2NUcATLMG+SKaO1PxbXaDpfoQikEfI7BABkNWk6AyQoBLy0Zwuu0eypGEHeNP6gugXEo1j8oZez/8fXA==}
     engines: {node: '>=18'}
 
-  '@permaweb/aoconnect@0.0.57':
-    resolution: {integrity: sha512-l1+47cZuQ8pOIMOdRXymcegCmefXjqR8Bc2MY6jIzWv9old/tG6mfCue2W1QviGyhjP3zEVQgr7YofkY2lq35Q==}
-    engines: {node: '>=18', yarn: please-use-npm}
+  '@permaweb/aoconnect@0.0.90':
+    resolution: {integrity: sha512-VKEkwKV5Lv6q2pai38gz/ngcRML4iApWsJc5B8X8ow9fJIXnd9UK8y0HMbrKUF/VB5Eb8r8lJhDr76yiL6QWAA==}
+    engines: {node: '>=18'}
+
+  '@permaweb/protocol-tag-utils@0.0.2':
+    resolution: {integrity: sha512-2IiKu71W7pkHKIzxabCGQ5q8DSppZaE/sPcPF2hn+OWwfe04M7b5X5LHRXQNPRuxHWuioieGdPQb3F7apOlffQ==}
 
   '@prisma/client@5.22.0':
     resolution: {integrity: sha512-M0SVXfyHnQREBKxCgyo7sffrKttwE6R8PMq330MIUF0pTwjUhLbW84pFDlf06B27XyCR++VtjugEnIHdr07SVA==}
@@ -857,6 +875,18 @@ packages:
     resolution: {integrity: sha512-KMReFUr0B4t+D+OBkjR3KYqvocp2XaSzO55UcB6mgQMd3KbcE+mWTyvVV7D/zsdEbNnV6acZUutkiHQXvTr1Rw==}
     engines: {node: '>= 8'}
 
+  ao-tokens@0.0.6:
+    resolution: {integrity: sha512-SLzOpqvvQAxkrwmz8kesKhjme0j1fID4jvKNH0AGT1OCPz1BGfQx649da4XYL4MkK3+Hj5lrhJYotZjnrLOmXQ==}
+    peerDependencies:
+      '@permaweb/aoconnect': '>= 0.0.51 < 1'
+
+  ar-gql@2.0.2:
+    resolution: {integrity: sha512-x803rnC20iN9gj1WlnwO+Cqvahu1QmnuwM529OdVzwl2krj/tdNoG4OZ1c1n6ougPVDWv+PNbkBaXggeiI6wDw==}
+    engines: {node: '>=18.0.0'}
+
+  arbundles@0.11.2:
+    resolution: {integrity: sha512-vyX7vY6S8B4RFhGSoCixbnR/Z7ckpJjK+b/H7zcgRWJqqXjZqQ+3DQIJ19vKl5AvzNSsj5ja9kQDoZhMiGpBFw==}
+
   arconnect@0.4.2:
     resolution: {integrity: sha512-Jkpd4QL3TVqnd3U683gzXmZUVqBUy17DdJDuL/3D9rkysLgX6ymJ2e+sR+xyZF5Rh42CBqDXWNMmCjBXeP7Gbw==}
 
@@ -888,11 +918,17 @@ packages:
   asn1.js@5.4.1:
     resolution: {integrity: sha512-+I//4cYPccV8LdmBLiX8CYvf9Sp3vQsrqu2QNXRcrbiWvcx/UdlFiqUJJzxRQxgsZmvhXhn4cSKeSmoFjVdupA==}
 
+  async-retry@1.3.3:
+    resolution: {integrity: sha512-wfr/jstw9xNi/0teMHrRW7dsz3Lt5ARhYNZ2ewpadnhaIp5mbALhOAP+EAdsC7t4Z6wqsDVv9+W6gm1Dk9mEyw==}
+
   async@3.2.6:
     resolution: {integrity: sha512-htCUDlxyyCLMgaM3xXg0C0LW2xqfuQ6p05pCEIsXuyQ+a1koYKTuBMzRNwmybfLgvJDMd0r1LTn4+E0Ti6C2AA==}
 
   asynckit@0.4.0:
     resolution: {integrity: sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q==}
+
+  axios@1.12.2:
+    resolution: {integrity: sha512-vMJzPewAlRyOgxV2dU0Cuz2O8zzzx9VYtbJOaBgXFeLc4IV/Eg50n4LowmehOOR61S8ZMpc2K5Sa7g6A4jfkUw==}
 
   babel-jest@29.7.0:
     resolution: {integrity: sha512-BrvGY3xZSwEcCzKvKsCi2GgHqDqsYkOP4/by5xCgIwGXQxIEh+8ew3gmrE1y7XRR6LHZIj6yLYnUi/mm2KXKBg==}
@@ -1408,8 +1444,21 @@ packages:
   fn.name@1.1.0:
     resolution: {integrity: sha512-GRnmB5gPyJpAhTQdSZTSp9uaPSvl09KoYcMQtsB9rQoOmzs9dH6ffeccH+Z+cv6P68Hu5bC6JjRh4Ah/mHSNRw==}
 
+  follow-redirects@1.15.11:
+    resolution: {integrity: sha512-deG2P0JfjrTxl50XGCDyfI97ZGVCxIpfKYmfyrQ54n5FO/0gfIES8C/Psl6kWVDolizcaaxZJnTS0QSMxvnsBQ==}
+    engines: {node: '>=4.0'}
+    peerDependencies:
+      debug: '*'
+    peerDependenciesMeta:
+      debug:
+        optional: true
+
   form-data@3.0.4:
     resolution: {integrity: sha512-f0cRzm6dkyVYV3nPoooP8XlccPQukegwhAnpoLcXy+X+A8KfpGOoXwDr9FLZd3wzgLaBGQBE3lY93Zm/i1JvIQ==}
+    engines: {node: '>= 6'}
+
+  form-data@4.0.4:
+    resolution: {integrity: sha512-KrGhL9Q4zjj0kiUt5OO4Mr/A/jlI2jDYs5eHBpYHPcBEVSiipAvn2Ko2HnPe20rmcuuvMHNdZFp+4IlGTMF0Ow==}
     engines: {node: '>= 6'}
 
   formidable@1.2.6:
@@ -1529,6 +1578,9 @@ packages:
   http-errors@2.0.0:
     resolution: {integrity: sha512-FtwrG/euBzaEjYeRqOgly7G0qviiXoJWnvEH2Z1plBdXgbyjv34pHTSb9zoeHMyDy33+DWy5Wt9Wo+TURtOYSQ==}
     engines: {node: '>= 0.8'}
+
+  http-message-signatures@1.0.4:
+    resolution: {integrity: sha512-gavCQWnxHFg0BVlKs6CmYK7hNSH1o0x0mHTC68yBAHYOYuTVXPv52mEE7QuT5TenfiagTdOa/zPJzen4lEX7Rg==}
 
   human-signals@2.1.0:
     resolution: {integrity: sha512-B4FFZ6q/T2jhhksgkbEW3HBvWIfDW85snkQgawt07S7J5QXTk6BkNV+0yAeZrM5QpMAdYlocGoljn0sJ/WQkFw==}
@@ -1928,6 +1980,13 @@ packages:
   lines-and-columns@1.2.4:
     resolution: {integrity: sha512-7ylylesZQ/PV29jhEDl3Ufjo6ZX7gCqJr5F7PKrqc93v7fzSymt1BpwEU8nAUXs8qzzvqhbjhK5QZg6Mt/HkBg==}
 
+  liquidops@1.2.28:
+    resolution: {integrity: sha512-ziJrmsXaVMdsoErXSWYwkDyHDDdYjyxv2slswDtuuGHARsIHMajXEH6/vKQaJ0pZeOZLwWKn4nRMpx0GiEHDmg==}
+    peerDependencies:
+      '@permaweb/aoconnect': '>= 0.0.85 < 1'
+      ao-tokens: '>= 0.0.6'
+      warp-arbundles: '>= 1.0.4'
+
   locate-path@5.0.0:
     resolution: {integrity: sha512-t7hw9pI+WvuwNJXwk5zVHpyhIqzg2qTlklJOf0mVxGSbe3Fp2VieZcduNYjaLDoy6p9uGpQEGWG87WpMKlNq8g==}
     engines: {node: '>=8'}
@@ -2258,6 +2317,9 @@ packages:
     resolution: {integrity: sha512-llQsMLSUDUPT44jdrU/O37qlnifitDP+ZwrmmZcoSKyLKvtZxpyV0n2/bD/N4tBAAZ/gJEdZU7KMraoK1+XYAg==}
     engines: {node: '>= 0.10'}
 
+  proxy-from-env@1.1.0:
+    resolution: {integrity: sha512-D+zkORCbA9f1tdWRK0RaCR3GPv50cMxcrz4X8k5LTSUD1Dkw47mKJEZQNunItRTkWwgtaUSo1RVFRIG9ZXiFYg==}
+
   punycode@2.3.1:
     resolution: {integrity: sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg==}
     engines: {node: '>=6'}
@@ -2503,6 +2565,14 @@ packages:
   strip-json-comments@3.1.1:
     resolution: {integrity: sha512-6fPc+R4ihwqP6N/aIv2f1gMH8lOVtWQHoqC4yK6oSDVVocumAsfCqjkXnqiYMhmMwS/mEHLp7Vehlt3ql6lEig==}
     engines: {node: '>=8'}
+
+  structured-headers@1.0.1:
+    resolution: {integrity: sha512-QYBxdBtA4Tl5rFPuqmbmdrS9kbtren74RTJTcs0VSQNVV5iRhJD4QlYTLD0+81SBwUQctjEQzjTRI3WG4DzICA==}
+    engines: {node: '>= 14', npm: '>=6'}
+
+  structured-headers@2.0.2:
+    resolution: {integrity: sha512-IUul56vVHuMg2UxWhwDj9zVJE6ztYEQQkynr1FQ/NydPhivtk5+Qb2N1RS36owEFk2fNUriTguJ2R7htRObcdA==}
+    engines: {node: '>=18', npm: '>=6'}
 
   superagent@6.1.0:
     resolution: {integrity: sha512-OUDHEssirmplo3F+1HWKUrUjvnQuA+nZI6i/JJBdXb5eq9IyEQwPyPpqND+SSsxf6TygpBEkUjISVRN4/VOpeg==}
@@ -3039,6 +3109,31 @@ snapshots:
       enabled: 2.0.0
       kuler: 2.0.0
 
+  '@dha-team/arbundles@1.0.3':
+    dependencies:
+      '@ethersproject/bytes': 5.8.0
+      '@ethersproject/hash': 5.8.0
+      '@ethersproject/providers': 5.7.2
+      '@ethersproject/signing-key': 5.8.0
+      '@ethersproject/transactions': 5.8.0
+      '@ethersproject/wallet': 5.7.0
+      '@noble/ed25519': 1.6.1
+      arweave: 1.15.7
+      base64url: 3.0.1
+      bs58: 4.0.1
+      keccak: 3.0.2
+      secp256k1: 5.0.0
+    optionalDependencies:
+      '@randlabs/myalgo-connect': 1.1.2
+      algosdk: 1.13.1
+      arweave-stream-tx: 1.1.0(arweave@1.15.7)
+      multistream: 4.1.0
+      tmp-promise: 3.0.2
+    transitivePeerDependencies:
+      - bufferutil
+      - supports-color
+      - utf-8-validate
+
   '@dha-team/arbundles@1.0.4':
     dependencies:
       '@ethersproject/bytes': 5.7.0
@@ -3359,6 +3454,16 @@ snapshots:
 
   '@humanwhocodes/object-schema@2.0.3': {}
 
+  '@irys/arweave@0.0.2':
+    dependencies:
+      asn1.js: 5.4.1
+      async-retry: 1.3.3
+      axios: 1.12.2(debug@4.4.3)
+      base64-js: 1.5.1
+      bignumber.js: 9.3.1
+    transitivePeerDependencies:
+      - debug
+
   '@istanbuljs/load-nyc-config@1.1.0':
     dependencies:
       camelcase: 5.3.1
@@ -3615,18 +3720,27 @@ snapshots:
       ramda: 0.30.1
       zod: 3.25.76
 
-  '@permaweb/aoconnect@0.0.57':
+  '@permaweb/aoconnect@0.0.90':
     dependencies:
+      '@dha-team/arbundles': 1.0.3
       '@permaweb/ao-scheduler-utils': 0.0.29
+      '@permaweb/protocol-tag-utils': 0.0.2
+      axios: 1.12.2(debug@4.4.3)
+      base64url: 3.0.1
       buffer: 6.0.3
       debug: 4.4.3
+      http-message-signatures: 1.0.4
       hyper-async: 1.1.2
       mnemonist: 0.39.8
       ramda: 0.30.1
-      warp-arbundles: 1.0.4
+      structured-headers: 2.0.2
       zod: 3.25.76
     transitivePeerDependencies:
+      - bufferutil
       - supports-color
+      - utf-8-validate
+
+  '@permaweb/protocol-tag-utils@0.0.2': {}
 
   '@prisma/client@5.22.0(prisma@5.22.0)':
     optionalDependencies:
@@ -3894,10 +4008,10 @@ snapshots:
 
   '@ungap/structured-clone@1.3.0': {}
 
-  '@vela-ventures/vento-sdk@1.1.2(@permaweb/aoconnect@0.0.57)(ethers@6.15.0)':
+  '@vela-ventures/vento-sdk@1.1.2(@permaweb/aoconnect@0.0.90)(ethers@6.15.0)':
     dependencies:
       '@dha-team/arbundles': 1.0.4
-      '@permaweb/aoconnect': 0.0.57
+      '@permaweb/aoconnect': 0.0.90
       ethers: 6.15.0
     transitivePeerDependencies:
       - bufferutil
@@ -3970,6 +4084,39 @@ snapshots:
       normalize-path: 3.0.0
       picomatch: 2.3.1
 
+  ao-tokens@0.0.6(@permaweb/aoconnect@0.0.90):
+    dependencies:
+      '@permaweb/aoconnect': 0.0.90
+
+  ar-gql@2.0.2: {}
+
+  arbundles@0.11.2(arweave@1.15.7):
+    dependencies:
+      '@ethersproject/bytes': 5.8.0
+      '@ethersproject/hash': 5.8.0
+      '@ethersproject/providers': 5.7.2
+      '@ethersproject/signing-key': 5.8.0
+      '@ethersproject/transactions': 5.8.0
+      '@ethersproject/wallet': 5.7.0
+      '@irys/arweave': 0.0.2
+      '@noble/ed25519': 1.6.1
+      base64url: 3.0.1
+      bs58: 4.0.1
+      keccak: 3.0.2
+      secp256k1: 5.0.0
+    optionalDependencies:
+      '@randlabs/myalgo-connect': 1.1.2
+      algosdk: 1.13.1
+      arweave-stream-tx: 1.1.0(arweave@1.15.7)
+      multistream: 4.1.0
+      tmp-promise: 3.0.2
+    transitivePeerDependencies:
+      - arweave
+      - bufferutil
+      - debug
+      - supports-color
+      - utf-8-validate
+
   arconnect@0.4.2:
     dependencies:
       arweave: 1.15.7
@@ -4007,10 +4154,21 @@ snapshots:
       minimalistic-assert: 1.0.1
       safer-buffer: 2.1.2
 
+  async-retry@1.3.3:
+    dependencies:
+      retry: 0.13.1
+
   async@3.2.6: {}
 
-  asynckit@0.4.0:
-    optional: true
+  asynckit@0.4.0: {}
+
+  axios@1.12.2(debug@4.4.3):
+    dependencies:
+      follow-redirects: 1.15.11(debug@4.4.3)
+      form-data: 4.0.4
+      proxy-from-env: 1.1.0
+    transitivePeerDependencies:
+      - debug
 
   babel-jest@29.7.0(@babel/core@7.28.4):
     dependencies:
@@ -4244,7 +4402,6 @@ snapshots:
   combined-stream@1.0.8:
     dependencies:
       delayed-stream: 1.0.0
-    optional: true
 
   component-emitter@1.3.1:
     optional: true
@@ -4317,8 +4474,7 @@ snapshots:
 
   deepmerge@4.3.1: {}
 
-  delayed-stream@1.0.0:
-    optional: true
+  delayed-stream@1.0.0: {}
 
   depd@2.0.0: {}
 
@@ -4402,7 +4558,6 @@ snapshots:
       get-intrinsic: 1.3.0
       has-tostringtag: 1.0.2
       hasown: 2.0.2
-    optional: true
 
   escalade@3.2.0: {}
 
@@ -4629,6 +4784,10 @@ snapshots:
 
   fn.name@1.1.0: {}
 
+  follow-redirects@1.15.11(debug@4.4.3):
+    optionalDependencies:
+      debug: 4.4.3
+
   form-data@3.0.4:
     dependencies:
       asynckit: 0.4.0
@@ -4637,6 +4796,14 @@ snapshots:
       hasown: 2.0.2
       mime-types: 2.1.35
     optional: true
+
+  form-data@4.0.4:
+    dependencies:
+      asynckit: 0.4.0
+      combined-stream: 1.0.8
+      es-set-tostringtag: 2.1.0
+      hasown: 2.0.2
+      mime-types: 2.1.35
 
   formidable@1.2.6:
     optional: true
@@ -4730,7 +4897,6 @@ snapshots:
   has-tostringtag@1.0.2:
     dependencies:
       has-symbols: 1.1.0
-    optional: true
 
   hash.js@1.1.7:
     dependencies:
@@ -4761,6 +4927,10 @@ snapshots:
       setprototypeof: 1.2.0
       statuses: 2.0.1
       toidentifier: 1.0.1
+
+  http-message-signatures@1.0.4:
+    dependencies:
+      structured-headers: 1.0.1
 
   human-signals@2.1.0: {}
 
@@ -5242,7 +5412,7 @@ snapshots:
 
   kuler@2.0.0: {}
 
-  langchain@0.3.34(@langchain/core@0.3.77(openai@5.12.2(zod@3.25.76)))(handlebars@4.7.8)(openai@5.12.2(zod@3.25.76)):
+  langchain@0.3.34(@langchain/core@0.3.77(openai@5.12.2(zod@3.25.76)))(axios@1.12.2)(handlebars@4.7.8)(openai@5.12.2(zod@3.25.76)):
     dependencies:
       '@langchain/core': 0.3.77(openai@5.12.2(zod@3.25.76))
       '@langchain/openai': 0.6.13(@langchain/core@0.3.77(openai@5.12.2(zod@3.25.76)))
@@ -5257,6 +5427,7 @@ snapshots:
       yaml: 2.8.1
       zod: 3.25.76
     optionalDependencies:
+      axios: 1.12.2(debug@4.4.3)
       handlebars: 4.7.8
     transitivePeerDependencies:
       - '@opentelemetry/api'
@@ -5285,6 +5456,20 @@ snapshots:
       type-check: 0.4.0
 
   lines-and-columns@1.2.4: {}
+
+  liquidops@1.2.28(@permaweb/aoconnect@0.0.90)(ao-tokens@0.0.6(@permaweb/aoconnect@0.0.90))(arweave@1.15.7)(warp-arbundles@1.0.4):
+    dependencies:
+      '@permaweb/aoconnect': 0.0.90
+      ao-tokens: 0.0.6(@permaweb/aoconnect@0.0.90)
+      ar-gql: 2.0.2
+      arbundles: 0.11.2(arweave@1.15.7)
+      warp-arbundles: 1.0.4
+    transitivePeerDependencies:
+      - arweave
+      - bufferutil
+      - debug
+      - supports-color
+      - utf-8-validate
 
   locate-path@5.0.0:
     dependencies:
@@ -5554,6 +5739,8 @@ snapshots:
       forwarded: 0.2.0
       ipaddr.js: 1.9.1
 
+  proxy-from-env@1.1.0: {}
+
   punycode@2.3.1: {}
 
   pure-rand@6.1.0: {}
@@ -5802,6 +5989,10 @@ snapshots:
   strip-json-comments@2.0.1: {}
 
   strip-json-comments@3.1.1: {}
+
+  structured-headers@1.0.1: {}
+
+  structured-headers@2.0.2: {}
 
   superagent@6.1.0:
     dependencies:
