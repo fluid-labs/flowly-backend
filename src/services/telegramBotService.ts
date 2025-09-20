@@ -171,14 +171,14 @@ export class TelegramBotService {
         // Conversation command
         this.addCommand({
             command: "chat",
-            description: "Start AI conversation mode",
+            description: "View AI conversation information",
             handler: this.handleStartConversation.bind(this),
         });
 
         // Stop conversation command
         this.addCommand({
             command: "stopchat",
-            description: "Stop AI conversation mode",
+            description: "Clear conversation history",
             handler: this.handleStopConversation.bind(this),
         });
     }
@@ -214,10 +214,13 @@ export class TelegramBotService {
                 message += `• Send and receive tokens\n`;
                 message += `• View transaction history\n`;
                 message += `• Trade on AO network\n\n`;
+                message += `💬 **Just send me any message to start trading!**\n`;
+                message += `Example: "What's my balance?" or "Send 5 AO to abc123..."\n\n`;
                 message += `Type /help to see all available commands.`;
             } else {
                 message = `👋 Welcome back, ${user.firstName || "there"}!\n\n`;
                 message += `🔐 Your wallet: \`${user.walletAddress}\`\n\n`;
+                message += `💬 **Just send me any message to start trading!**\n`;
                 message += `What would you like to do today?`;
             }
 
@@ -234,7 +237,6 @@ export class TelegramBotService {
                     Markup.button.callback("⚙️ Settings", "settings"),
                     Markup.button.callback("❓ Help", "help"),
                 ],
-                [Markup.button.callback("🤖 Start Conversation", "start_chat")],
             ]);
 
             await this.safeSendMessage(ctx, message, {
@@ -422,8 +424,9 @@ export class TelegramBotService {
             });
 
             message += `\n**AI Conversation:**\n`;
-            message += `/chat - Start AI conversation mode\n`;
-            message += `/stopchat - Stop AI conversation mode\n\n`;
+            message += `💬 Send any message to interact with AI for DeFi transactions\n`;
+            message += `/chat - View conversation mode info\n`;
+            message += `/stopchat - Clear conversation history\n\n`;
 
             message += `**Advanced Commands:**\n`;
             message += `/transfer <token_id> <recipient> <amount> - Send tokens\n`;
@@ -479,28 +482,25 @@ export class TelegramBotService {
     }
 
     /**
-     * Handle /chat command - Start conversation mode
+     * Handle /chat command - Show conversation info
      */
     private async handleStartConversation(ctx: BotContext): Promise<void> {
         try {
             const telegramId = ctx.from?.id;
             if (!telegramId) return;
 
-            // Initialize conversation history
-            this.conversationHistory.set(telegramId, []);
-            ctx.conversationMode = true;
-
-            let message = `🤖 **AI Conversation Mode Activated**\n\n`;
-            message += `You can now chat with me naturally! I can help you with:\n\n`;
+            let message = `🤖 **AI Conversation Mode**\n\n`;
+            message += `✅ **Always Active** - Just send me any message!\n\n`;
+            message += `I can help you with:\n\n`;
             message += `💸 **Token Transfers** - "Send 10 AO to abc123..."\n`;
             message += `💰 **Balance Checks** - "What's my balance?"\n`;
             message += `📊 **Account Info** - "Show my wallet details"\n`;
             message += `❓ **General Help** - Ask me anything about AO tokens\n\n`;
             message += `💡 **Example:** "Send 5 AO tokens to def456..."\n\n`;
-            message += `Type /stopchat to exit conversation mode.`;
+            message += `Type /stopchat to clear conversation history.`;
 
             const keyboard = Markup.inlineKeyboard([
-                [Markup.button.callback("❌ Stop Chat", "stop_chat")],
+                [Markup.button.callback("🗑️ Clear History", "stop_chat")],
             ]);
 
             await ctx.reply(message, {
@@ -508,15 +508,15 @@ export class TelegramBotService {
                 ...keyboard,
             });
 
-            logger.info("Conversation mode started", { telegramId });
+            logger.info("Conversation info shown", { telegramId });
         } catch (error) {
-            logger.error("Error starting conversation:", error);
-            await ctx.reply("❌ Failed to start conversation mode.");
+            logger.error("Error showing conversation info:", error);
+            await ctx.reply("❌ Failed to show conversation information.");
         }
     }
 
     /**
-     * Handle /stopchat command - Stop conversation mode
+     * Handle /stopchat command - Clear conversation history
      */
     private async handleStopConversation(ctx: BotContext): Promise<void> {
         try {
@@ -525,17 +525,16 @@ export class TelegramBotService {
 
             // Clear conversation history
             this.conversationHistory.delete(telegramId);
-            ctx.conversationMode = false;
 
             await ctx.reply(
-                "🤖 **Conversation mode deactivated.**\n\nYou can use regular commands now. Type /chat to start conversation mode again.",
+                "🗑️ **Conversation history cleared.**\n\nYou can continue chatting with me - just send any message!",
                 { parse_mode: "Markdown" }
             );
 
-            logger.info("Conversation mode stopped", { telegramId });
+            logger.info("Conversation history cleared", { telegramId });
         } catch (error) {
-            logger.error("Error stopping conversation:", error);
-            await ctx.reply("❌ Failed to stop conversation mode.");
+            logger.error("Error clearing conversation history:", error);
+            await ctx.reply("❌ Failed to clear conversation history.");
         }
     }
 
@@ -575,10 +574,10 @@ export class TelegramBotService {
     }
 
     /**
-     * Setup message handlers for conversation mode
+     * Setup message handlers for all non-command messages
      */
     private setupMessageHandlers(): void {
-        // Handle text messages in conversation mode
+        // Handle all text messages as conversation messages (except commands)
         this.bot.on("text", async (ctx) => {
             try {
                 const telegramId = ctx.from?.id;
@@ -587,13 +586,8 @@ export class TelegramBotService {
                 // Skip if it's a command
                 if ((ctx.message as any).text?.startsWith("/")) return;
 
-                // Check if user is in conversation mode
-                const hasConversationHistory =
-                    this.conversationHistory.has(telegramId);
-
-                if (hasConversationHistory) {
-                    await this.handleConversationMessage(ctx);
-                }
+                // Process all non-command messages through LangChain
+                await this.handleConversationMessage(ctx);
             } catch (error) {
                 logger.error("Error handling text message:", error);
                 await ctx.reply(
@@ -616,7 +610,7 @@ export class TelegramBotService {
             // Show typing indicator
             await ctx.sendChatAction("typing");
 
-            // Get conversation history
+            // Get or initialize conversation history
             const history = this.conversationHistory.get(telegramId) || [];
 
             // Add user message to history
@@ -660,7 +654,7 @@ export class TelegramBotService {
             logger.error("Error in conversation message:", error);
             await this.safeSendMessage(
                 ctx,
-                "🤖 I encountered an error processing your message. Please try again or use /stopchat to exit conversation mode."
+                "🤖 I encountered an error processing your message. Please try again."
             );
         }
     }
