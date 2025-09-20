@@ -81,7 +81,7 @@ export class TelegramBotService {
                     try {
                         await this.safeSendMessage(
                             ctx,
-                            "❌ An error occurred. Please try again later."
+                            "An error occurred. Please try again later."
                         );
                     } catch (replyError) {
                         logger.error(
@@ -204,50 +204,33 @@ export class TelegramBotService {
             let message = "";
 
             if (isNewUser) {
-                message = `🎉 Welcome to AO Trading Bot, ${
+                message = `Welcome to Flowly, ${
                     user.firstName || "there"
                 }!\n\n`;
-                message += `✅ Your secure wallet has been created!\n`;
-                message += `🔐 Address: \`${user.walletAddress}\`\n\n`;
-                message += `🚀 You can now:\n`;
+                message += `Your secure wallet has been created!\n`;
+                message += `Address: \`${user.walletAddress}\`\n\n`;
+                message += `You can now:\n`;
                 message += `• Check your balance\n`;
                 message += `• Send and receive tokens\n`;
                 message += `• View transaction history\n`;
                 message += `• Trade on AO network\n\n`;
-                message += `💬 **Just send me any message to start trading!**\n`;
+                message += `**Just send me any message to start trading!**\n`;
                 message += `Example: "What's my balance?" or "Send 5 AO to abc123..."\n\n`;
-                message += `Type /help to see all available commands.`;
             } else {
-                message = `👋 Welcome back, ${user.firstName || "there"}!\n\n`;
-                message += `🔐 Your wallet: \`${user.walletAddress}\`\n\n`;
-                message += `💬 **Just send me any message to start trading!**\n`;
+                message = `Welcome back, ${user.firstName || "there"}!\n\n`;
+                message += `Your wallet: \`${user.walletAddress}\`\n\n`;
+                message += `**Just send me any message to start trading!**\n`;
                 message += `What would you like to do today?`;
             }
 
-            const keyboard = Markup.inlineKeyboard([
-                [
-                    Markup.button.callback("💰 Check Balance", "balance"),
-                    Markup.button.callback("📊 View Stats", "stats"),
-                ],
-                [
-                    Markup.button.callback("💸 Send Tokens", "send"),
-                    Markup.button.callback("📜 History", "history"),
-                ],
-                [
-                    Markup.button.callback("⚙️ Settings", "settings"),
-                    Markup.button.callback("❓ Help", "help"),
-                ],
-            ]);
-
             await this.safeSendMessage(ctx, message, {
                 parse_mode: "Markdown",
-                ...keyboard,
             });
         } catch (error) {
             logger.error("Error in start command:", error);
             await this.safeSendMessage(
                 ctx,
-                "❌ Failed to initialize. Please try again."
+                "Failed to initialize. Please try again."
             );
         }
     }
@@ -264,35 +247,20 @@ export class TelegramBotService {
                 user.walletAddress
             );
 
-            let message = `🔐 **Your AO Wallet**\n\n`;
-            message += `📍 **Address:** \`${user.walletAddress}\`\n`;
-            message += `💰 **AR Balance:** ${arBalance} AR\n\n`;
-            message += `🔗 **Network:** AO Testnet\n`;
-            message += `📅 **Created:** ${user.createdAt.toLocaleDateString()}\n`;
-
-            const keyboard = Markup.inlineKeyboard([
-                [
-                    Markup.button.callback(
-                        "🔄 Refresh Balance",
-                        "refresh_balance"
-                    ),
-                    Markup.button.callback("📋 Copy Address", "copy_address"),
-                ],
-                [
-                    Markup.button.callback("💸 Send Tokens", "send"),
-                    Markup.button.callback("📜 History", "history"),
-                ],
-            ]);
+            let message = `**Your AO Wallet**\n\n`;
+            message += `**Address:** \`${user.walletAddress}\`\n`;
+            message += `**AR Balance:** ${arBalance} AR\n\n`;
+            message += `**Network:** AO Testnet\n`;
+            message += `**Created:** ${user.createdAt.toLocaleDateString()}\n`;
 
             await this.safeSendMessage(ctx, message, {
                 parse_mode: "Markdown",
-                ...keyboard,
             });
         } catch (error) {
             logger.error("Error in wallet command:", error);
             await this.safeSendMessage(
                 ctx,
-                "❌ Failed to fetch wallet information. Please try again."
+                "Failed to fetch wallet information. Please try again."
             );
         }
     }
@@ -306,7 +274,7 @@ export class TelegramBotService {
 
             const loadingMessage = await this.safeSendMessage(
                 ctx,
-                "🔄 Checking balance..."
+                "Checking balance..."
             );
             if (!loadingMessage) return; // User blocked bot
 
@@ -315,28 +283,20 @@ export class TelegramBotService {
                 user.walletAddress
             );
 
-            let message = `💰 **Balance Information**\n\n`;
-            message += `🔸 **AR:** ${arBalance} AR\n`;
-            message += `🔸 **Address:** \`${user.walletAddress}\`\n\n`;
-            message += `💡 *To check token balances, use:*\n`;
+            let message = `**Balance Information**\n\n`;
+            message += `**AR:** ${arBalance} AR\n`;
+            message += `**Address:** \`${user.walletAddress}\`\n\n`;
+            message += `*To check token balances, use:*\n`;
             message += `/token_balance <token_process_id>`;
-
-            const keyboard = Markup.inlineKeyboard([
-                [
-                    Markup.button.callback("🔄 Refresh", "refresh_balance"),
-                    Markup.button.callback("💸 Send", "send"),
-                ],
-            ]);
 
             await this.safeEditMessage(ctx, message, {
                 parse_mode: "Markdown",
-                ...keyboard,
             });
         } catch (error) {
             logger.error("Error in balance command:", error);
             await this.safeSendMessage(
                 ctx,
-                "❌ Failed to fetch balance. Please try again."
+                "Failed to fetch balance. Please try again."
             );
         }
     }
@@ -346,12 +306,12 @@ export class TelegramBotService {
      */
     private async handleSend(ctx: BotContext): Promise<void> {
         try {
-            let message = `💸 **Send Tokens**\n\n`;
+            let message = `**Send Tokens**\n\n`;
             message += `To send tokens, use the following format:\n`;
             message += `\`/transfer <token_process_id> <recipient_address> <amount>\`\n\n`;
             message += `**Example:**\n`;
             message += `\`/transfer abc123... def456... 100\`\n\n`;
-            message += `💡 **Tips:**\n`;
+            message += `**Tips:**\n`;
             message += `• Make sure you have sufficient balance\n`;
             message += `• Double-check the recipient address\n`;
             message += `• Transaction fees apply`;
@@ -359,7 +319,7 @@ export class TelegramBotService {
             await ctx.reply(message, { parse_mode: "Markdown" });
         } catch (error) {
             logger.error("Error in send command:", error);
-            await ctx.reply("❌ Failed to show send instructions.");
+            await ctx.reply("Failed to show send instructions.");
         }
     }
 
@@ -370,7 +330,7 @@ export class TelegramBotService {
         try {
             const user = ctx.user;
 
-            await ctx.reply("📜 Loading transaction history...");
+            await ctx.reply("Loading transaction history...");
 
             const transactions = await userService.getUserTransactions(
                 user.id,
@@ -379,35 +339,30 @@ export class TelegramBotService {
 
             if (transactions.length === 0) {
                 await ctx.editMessageText(
-                    "📜 **Transaction History**\n\nNo transactions found."
+                    "**Transaction History**\n\nNo transactions found."
                 );
                 return;
             }
 
-            let message = `📜 **Recent Transactions**\n\n`;
+            let message = `**Recent Transactions**\n\n`;
 
             transactions.forEach((tx, index) => {
-                const status = this.getStatusEmoji(tx.status);
+                const status = this.getStatusText(tx.status);
                 const date = tx.createdAt.toLocaleDateString();
                 const amount = parseFloat(tx.amount).toFixed(6);
 
                 message += `${index + 1}. ${status} **${tx.type}**\n`;
-                message += `   💰 ${amount} ${tx.tokenSymbol || "tokens"}\n`;
-                message += `   📅 ${date}\n`;
-                message += `   🔗 \`${tx.txId.substring(0, 20)}...\`\n\n`;
+                message += `   ${amount} ${tx.tokenSymbol || "tokens"}\n`;
+                message += `   ${date}\n`;
+                message += `   \`${tx.txId.substring(0, 20)}...\`\n\n`;
             });
-
-            const keyboard = Markup.inlineKeyboard([
-                [Markup.button.callback("🔄 Refresh", "refresh_history")],
-            ]);
 
             await ctx.editMessageText(message, {
                 parse_mode: "Markdown",
-                ...keyboard,
             });
         } catch (error) {
             logger.error("Error in history command:", error);
-            await ctx.reply("❌ Failed to fetch transaction history.");
+            await ctx.reply("Failed to fetch transaction history.");
         }
     }
 
@@ -416,7 +371,7 @@ export class TelegramBotService {
      */
     private async handleHelp(ctx: BotContext): Promise<void> {
         try {
-            let message = `❓ **AO Trading Bot Help**\n\n`;
+            let message = `**AO Trading Bot Help**\n\n`;
             message += `**Available Commands:**\n\n`;
 
             this.commands.forEach((cmd) => {
@@ -424,7 +379,7 @@ export class TelegramBotService {
             });
 
             message += `\n**AI Conversation:**\n`;
-            message += `💬 Send any message to interact with AI for DeFi transactions\n`;
+            message += `Send any message to interact with AI for DeFi transactions\n`;
             message += `/chat - View conversation mode info\n`;
             message += `/stopchat - Clear conversation history\n\n`;
 
@@ -439,7 +394,7 @@ export class TelegramBotService {
             await ctx.reply(message, { parse_mode: "Markdown" });
         } catch (error) {
             logger.error("Error in help command:", error);
-            await ctx.reply("❌ Failed to show help information.");
+            await ctx.reply("Failed to show help information.");
         }
     }
 
@@ -450,34 +405,21 @@ export class TelegramBotService {
         try {
             const user = ctx.user;
 
-            let message = `⚙️ **Settings**\n\n`;
-            message += `🔔 **Notifications:** ${
-                user.notifications ? "✅ Enabled" : "❌ Disabled"
+            let message = `**Settings**\n\n`;
+            message += `**Notifications:** ${
+                user.notifications ? "Enabled" : "Disabled"
             }\n`;
-            message += `🌐 **Language:** ${user.languageCode || "en"}\n`;
-            message += `📱 **Account Type:** ${
-                user.isPremium ? "⭐ Premium" : "🆓 Free"
+            message += `**Language:** ${user.languageCode || "en"}\n`;
+            message += `**Account Type:** ${
+                user.isPremium ? "Premium" : "Free"
             }\n\n`;
-
-            const keyboard = Markup.inlineKeyboard([
-                [
-                    Markup.button.callback(
-                        user.notifications
-                            ? "🔕 Disable Notifications"
-                            : "🔔 Enable Notifications",
-                        "toggle_notifications"
-                    ),
-                ],
-                [Markup.button.callback("🗑️ Delete Account", "delete_account")],
-            ]);
 
             await ctx.reply(message, {
                 parse_mode: "Markdown",
-                ...keyboard,
             });
         } catch (error) {
             logger.error("Error in settings command:", error);
-            await ctx.reply("❌ Failed to show settings.");
+            await ctx.reply("Failed to show settings.");
         }
     }
 
@@ -489,29 +431,24 @@ export class TelegramBotService {
             const telegramId = ctx.from?.id;
             if (!telegramId) return;
 
-            let message = `🤖 **AI Conversation Mode**\n\n`;
-            message += `✅ **Always Active** - Just send me any message!\n\n`;
+            let message = `**AI Conversation Mode**\n\n`;
+            message += `**Always Active** - Just send me any message!\n\n`;
             message += `I can help you with:\n\n`;
-            message += `💸 **Token Transfers** - "Send 10 AO to abc123..."\n`;
-            message += `💰 **Balance Checks** - "What's my balance?"\n`;
-            message += `📊 **Account Info** - "Show my wallet details"\n`;
-            message += `❓ **General Help** - Ask me anything about AO tokens\n\n`;
-            message += `💡 **Example:** "Send 5 AO tokens to def456..."\n\n`;
+            message += `**Token Transfers** - "Send 10 AO to abc123..."\n`;
+            message += `**Balance Checks** - "What's my balance?"\n`;
+            message += `**Account Info** - "Show my wallet details"\n`;
+            message += `**General Help** - Ask me anything about AO tokens\n\n`;
+            message += `**Example:** "Send 5 AO tokens to def456..."\n\n`;
             message += `Type /stopchat to clear conversation history.`;
-
-            const keyboard = Markup.inlineKeyboard([
-                [Markup.button.callback("🗑️ Clear History", "stop_chat")],
-            ]);
 
             await ctx.reply(message, {
                 parse_mode: "Markdown",
-                ...keyboard,
             });
 
             logger.info("Conversation info shown", { telegramId });
         } catch (error) {
             logger.error("Error showing conversation info:", error);
-            await ctx.reply("❌ Failed to show conversation information.");
+            await ctx.reply("Failed to show conversation information.");
         }
     }
 
@@ -527,14 +464,14 @@ export class TelegramBotService {
             this.conversationHistory.delete(telegramId);
 
             await ctx.reply(
-                "🗑️ **Conversation history cleared.**\n\nYou can continue chatting with me - just send any message!",
+                "**Conversation history cleared.**\n\nYou can continue chatting with me - just send any message!",
                 { parse_mode: "Markdown" }
             );
 
             logger.info("Conversation history cleared", { telegramId });
         } catch (error) {
             logger.error("Error clearing conversation history:", error);
-            await ctx.reply("❌ Failed to clear conversation history.");
+            await ctx.reply("Failed to clear conversation history.");
         }
     }
 
@@ -545,31 +482,24 @@ export class TelegramBotService {
         try {
             const user = ctx.user;
 
-            await ctx.reply("📊 Loading statistics...");
+            await ctx.reply("Loading statistics...");
 
             const stats = await userService.getUserStats(user.id);
 
-            let message = `📊 **Account Statistics**\n\n`;
-            message += `📈 **Total Transactions:** ${stats.totalTransactions}\n`;
-            message += `✅ **Confirmed:** ${stats.confirmedTransactions}\n`;
-            message += `❌ **Failed:** ${stats.failedTransactions}\n`;
-            message += `💼 **Wallets:** ${stats.totalWallets}\n`;
-            message += `🎯 **Success Rate:** ${stats.successRate.toFixed(
-                1
-            )}%\n\n`;
-            message += `📅 **Member Since:** ${user.createdAt.toLocaleDateString()}`;
-
-            const keyboard = Markup.inlineKeyboard([
-                [Markup.button.callback("🔄 Refresh", "refresh_stats")],
-            ]);
+            let message = `**Account Statistics**\n\n`;
+            message += `**Total Transactions:** ${stats.totalTransactions}\n`;
+            message += `**Confirmed:** ${stats.confirmedTransactions}\n`;
+            message += `**Failed:** ${stats.failedTransactions}\n`;
+            message += `**Wallets:** ${stats.totalWallets}\n`;
+            message += `**Success Rate:** ${stats.successRate.toFixed(1)}%\n\n`;
+            message += `**Member Since:** ${user.createdAt.toLocaleDateString()}`;
 
             await ctx.editMessageText(message, {
                 parse_mode: "Markdown",
-                ...keyboard,
             });
         } catch (error) {
             logger.error("Error in stats command:", error);
-            await ctx.reply("❌ Failed to fetch statistics.");
+            await ctx.reply("Failed to fetch statistics.");
         }
     }
 
@@ -591,7 +521,7 @@ export class TelegramBotService {
             } catch (error) {
                 logger.error("Error handling text message:", error);
                 await ctx.reply(
-                    "❌ Error processing your message. Please try again."
+                    "Error processing your message. Please try again."
                 );
             }
         });
@@ -654,7 +584,7 @@ export class TelegramBotService {
             logger.error("Error in conversation message:", error);
             await this.safeSendMessage(
                 ctx,
-                "🤖 I encountered an error processing your message. Please try again."
+                "I encountered an error processing your message. Please try again."
             );
         }
     }
@@ -698,14 +628,14 @@ export class TelegramBotService {
             });
 
             const message = newNotificationState
-                ? "🔔 Notifications enabled!"
-                : "🔕 Notifications disabled!";
+                ? "Notifications enabled!"
+                : "Notifications disabled!";
 
             await ctx.answerCbQuery(message);
             await this.handleSettings(ctx);
         } catch (error) {
             logger.error("Error toggling notifications:", error);
-            await ctx.answerCbQuery("❌ Failed to update settings");
+            await ctx.answerCbQuery("Failed to update settings");
         }
     }
 
@@ -714,23 +644,15 @@ export class TelegramBotService {
      */
     private async handleDeleteAccount(ctx: BotContext): Promise<void> {
         try {
-            const keyboard = Markup.inlineKeyboard([
-                [
-                    Markup.button.callback("⚠️ Yes, Delete", "confirm_delete"),
-                    Markup.button.callback("❌ Cancel", "cancel_delete"),
-                ],
-            ]);
-
             await ctx.editMessageText(
-                "⚠️ **Delete Account**\n\nAre you sure you want to delete your account? This action cannot be undone and you will lose access to your wallet.",
+                "**Delete Account**\n\nAre you sure you want to delete your account? This action cannot be undone and you will lose access to your wallet.",
                 {
                     parse_mode: "Markdown",
-                    ...keyboard,
                 }
             );
         } catch (error) {
             logger.error("Error in delete account:", error);
-            await ctx.answerCbQuery("❌ Error occurred");
+            await ctx.answerCbQuery("Error occurred");
         }
     }
 
@@ -776,7 +698,7 @@ export class TelegramBotService {
             if (err.code !== 403) {
                 try {
                     ctx.reply(
-                        "❌ An unexpected error occurred. Please try again later."
+                        "An unexpected error occurred. Please try again later."
                     );
                 } catch (replyError) {
                     logger.error("Failed to send error message:", replyError);
@@ -818,20 +740,20 @@ export class TelegramBotService {
     }
 
     /**
-     * Get status emoji for transaction status
+     * Get status text for transaction status
      */
-    private getStatusEmoji(status: string): string {
+    private getStatusText(status: string): string {
         switch (status) {
             case "CONFIRMED":
-                return "✅";
+                return "CONFIRMED";
             case "PENDING":
-                return "⏳";
+                return "PENDING";
             case "FAILED":
-                return "❌";
+                return "FAILED";
             case "CANCELLED":
-                return "🚫";
+                return "CANCELLED";
             default:
-                return "❓";
+                return "UNKNOWN";
         }
     }
 

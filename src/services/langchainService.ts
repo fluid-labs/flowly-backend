@@ -123,7 +123,7 @@ export class LangChainService {
                         processId = config.ao.nativeTokenProcessId;
                     }
                     if (!processId) {
-                        return "❌ Token not supported.";
+                        return "Token not supported.";
                     }
 
                     // Determine quantity in base units
@@ -137,14 +137,14 @@ export class LangChainService {
                             user.walletAddress
                         );
                         if (bal === "0") {
-                            return "❌ Insufficient balance to transfer.";
+                            return "Insufficient balance to transfer.";
                         }
                         quantity = bal;
                     } else {
                         // Convert display amount to base units for token (always apply decimals)
                         const decimals = this.getDecimalsByAliasOrId(processId);
-                        const big = new (require("big.js")) (amtRaw);
-                        const denom = new (require("big.js")) (10).pow(decimals);
+                        const big = new (require("big.js"))(amtRaw);
+                        const denom = new (require("big.js"))(10).pow(decimals);
                         quantity = big.times(denom).round(0, 0).toString();
                     }
 
@@ -162,7 +162,8 @@ export class LangChainService {
                         signer,
                         data: "",
                     });
-                    const messageId = typeof sendRes === "string" ? sendRes : sendRes?.id;
+                    const messageId =
+                        typeof sendRes === "string" ? sendRes : sendRes?.id;
 
                     // Debug logs
                     console.log("[transfer-asset] process:", processId);
@@ -195,15 +196,31 @@ export class LangChainService {
 
                         console.log("[transfer-asset] result:", result);
 
-                        const sym = params.tokenSymbol?.toUpperCase() || (Object.entries(this.SUPPORTED_TOKENS).find(([, id]) => id === processId)?.[0] || "TOKENS");
-                        return `✅ Transfer initiated!\n- Amount: ${params.amount} ${sym}\n- Recipient: \`${params.recipientAddress}\`\n- TxID: \`${messageId}\`\n- Status: ${result.Output || "Submitted"}`;
+                        const sym =
+                            params.tokenSymbol?.toUpperCase() ||
+                            Object.entries(this.SUPPORTED_TOKENS).find(
+                                ([, id]) => id === processId
+                            )?.[0] ||
+                            "TOKENS";
+                        return `Transfer initiated!\n- Amount: ${
+                            params.amount
+                        } ${sym}\n- Recipient: \`${
+                            params.recipientAddress
+                        }\`\n- TxID: \`${messageId}\`\n- Status: ${
+                            result.Output || "Submitted"
+                        }`;
                     } catch (resultError) {
                         logger.warn(
                             "Could not fetch transfer result immediately",
                             { error: resultError }
                         );
-                        const sym = params.tokenSymbol?.toUpperCase() || (Object.entries(this.SUPPORTED_TOKENS).find(([, id]) => id === processId)?.[0] || "TOKENS");
-                        return `🔄 Transfer initiated successfully!\n- Amount: ${params.amount} ${sym}\n- Recipient: \`${params.recipientAddress}\`\n- TxID: \`${messageId}\`\n- Status: Processing`;
+                        const sym =
+                            params.tokenSymbol?.toUpperCase() ||
+                            Object.entries(this.SUPPORTED_TOKENS).find(
+                                ([, id]) => id === processId
+                            )?.[0] ||
+                            "TOKENS";
+                        return `Transfer initiated successfully!\n- Amount: ${params.amount} ${sym}\n- Recipient: \`${params.recipientAddress}\`\n- TxID: \`${messageId}\`\n- Status: Processing`;
                     }
                 } catch (error) {
                     logger.error("Transfer asset tool error", {
@@ -232,7 +249,7 @@ export class LangChainService {
                         telegramId.toString()
                     );
                     if (!user || !user.walletAddress) {
-                        return "❌ Wallet not found. Please create a wallet first using /start";
+                        return "Wallet not found. Please create a wallet first using /start";
                     }
                     return `\`${user.walletAddress}\``;
                 } catch (error) {
@@ -240,7 +257,7 @@ export class LangChainService {
                         error,
                         telegramId,
                     });
-                    return "❌ Error retrieving wallet address.";
+                    return "Error retrieving wallet address.";
                 }
             },
         });
@@ -277,7 +294,7 @@ export class LangChainService {
                         telegramId.toString()
                     );
                     if (!user || !user.walletAddress) {
-                        return "❌ Wallet not found. Please create a wallet first using /start";
+                        return "Wallet not found. Please create a wallet first using /start";
                     }
 
                     const processId =
@@ -304,34 +321,34 @@ export class LangChainService {
 
                         const decimals =
                             processId === config.ao.nativeTokenProcessId
-                                ? (config.ao.nativeTokenDecimals ?? 12)
+                                ? config.ao.nativeTokenDecimals ?? 12
                                 : 0;
                         const balance = this.formatAmountWithDecimals(
                             rawBalance,
                             decimals
                         );
 
-                        return `💰 **Your Balance**
+                        return `**Your Balance**
                         
-🔸 **Amount:** ${balance} AO tokens
-🔸 **Wallet:** \`${user.walletAddress}\`
-🔸 **Token Process:** \`${processId.substring(0, 20)}...\`
+**Amount:** ${balance} AO tokens
+**Wallet:** \`${user.walletAddress}\`
+**Token Process:** \`${processId.substring(0, 20)}...\`
 
-💡 Your balance is up to date!`;
+Your balance is up to date!`;
                     }
 
-                    return `💰 **Your Balance**
+                    return `**Your Balance**
                     
-🔸 **Amount:** 0 AO tokens
-🔸 **Wallet:** \`${user.walletAddress}\`
+**Amount:** 0 AO tokens
+**Wallet:** \`${user.walletAddress}\`
 
-💡 No tokens found in this wallet.`;
+No tokens found in this wallet.`;
                 } catch (error) {
                     logger.error("Balance check tool error", {
                         error,
                         telegramId,
                     });
-                    return `❌ Error checking balance: ${
+                    return `Error checking balance: ${
                         error instanceof Error ? error.message : "Unknown error"
                     }`;
                 }
@@ -352,7 +369,9 @@ export class LangChainService {
             - cursor: Optional cursor for pagination`,
             func: async (input: string) => {
                 try {
-                    const { tokenProcessId, limit, cursor } = JSON.parse(input || "{}");
+                    const { tokenProcessId, limit, cursor } = JSON.parse(
+                        input || "{}"
+                    );
                     if (!tokenProcessId) {
                         return "Error: tokenProcessId is required";
                     }
@@ -366,8 +385,12 @@ export class LangChainService {
                         process: tokenProcessId,
                         tags: [
                             { name: "Action", value: "Balances" },
-                            ...(limit ? [{ name: "Limit", value: String(limit) }] : []),
-                            ...(cursor ? [{ name: "Cursor", value: String(cursor) }] : []),
+                            ...(limit
+                                ? [{ name: "Limit", value: String(limit) }]
+                                : []),
+                            ...(cursor
+                                ? [{ name: "Cursor", value: String(cursor) }]
+                                : []),
                         ],
                         data: "",
                     });
@@ -377,7 +400,10 @@ export class LangChainService {
                     let data: any = undefined;
                     if (msg?.Data) {
                         try {
-                            data = typeof msg.Data === "string" ? JSON.parse(msg.Data) : msg.Data;
+                            data =
+                                typeof msg.Data === "string"
+                                    ? JSON.parse(msg.Data)
+                                    : msg.Data;
                         } catch {}
                     }
 
@@ -391,17 +417,25 @@ export class LangChainService {
                         : undefined;
 
                     // Build a concise summary (top 10 by balance)
-                    const entries = Object.entries(data) as Array<[string, number]>;
+                    const entries = Object.entries(data) as Array<
+                        [string, number]
+                    >;
                     entries.sort((a, b) => (b[1] as number) - (a[1] as number));
                     const top = entries.slice(0, 10);
 
-                    const lines = top.map(([addr, bal]) =>
-                        `${addr === user?.walletAddress ? "🟢 " : ""}${addr.substring(0, 10)}...: ${bal}`
+                    const lines = top.map(
+                        ([addr, bal]) =>
+                            `${
+                                addr === user?.walletAddress ? "* " : ""
+                            }${addr.substring(0, 10)}...: ${bal}`
                     );
 
-                    let response = "📊 Balances (top 10)\n" + lines.join("\n");
+                    let response = "Balances (top 10)\n" + lines.join("\n");
                     if (user && user.walletAddress) {
-                        response += `\n\nYou (${user.walletAddress.substring(0, 10)}...): ${userBalance ?? 0}`;
+                        response += `\n\nYou (${user.walletAddress.substring(
+                            0,
+                            10
+                        )}...): ${userBalance ?? 0}`;
                     }
                     return response;
                 } catch (error) {
@@ -409,7 +443,7 @@ export class LangChainService {
                         error,
                         telegramId,
                     });
-                    return "❌ Error listing balances.";
+                    return "Error listing balances.";
                 }
             },
         });
@@ -427,8 +461,11 @@ export class LangChainService {
                 try {
                     return await this.summarizeUserBalances(telegramId);
                 } catch (error) {
-                    logger.error("List my balances tool error", { error, telegramId });
-                    return "❌ Error retrieving balances.";
+                    logger.error("List my balances tool error", {
+                        error,
+                        telegramId,
+                    });
+                    return "Error retrieving balances.";
                 }
             },
         });
@@ -445,14 +482,23 @@ export class LangChainService {
             telegramId.toString()
         );
         if (!user || !user.walletAddress) {
-            return "❌ Wallet not found. Please create a wallet first using /start";
+            return "Wallet not found. Please create a wallet first using /start";
         }
 
-        const tracked = (config.ao.trackedTokens && config.ao.trackedTokens.length > 0)
-            ? config.ao.trackedTokens
-            : Array.from(new Set(Object.values(this.SUPPORTED_TOKENS).filter(Boolean)));
+        const tracked =
+            config.ao.trackedTokens && config.ao.trackedTokens.length > 0
+                ? config.ao.trackedTokens
+                : Array.from(
+                      new Set(
+                          Object.values(this.SUPPORTED_TOKENS).filter(Boolean)
+                      )
+                  );
 
-        const balances: Array<{ ticker?: string; processId: string; amount: string }>= [];
+        const balances: Array<{
+            ticker?: string;
+            processId: string;
+            amount: string;
+        }> = [];
 
         for (const pid of tracked) {
             try {
@@ -470,19 +516,30 @@ export class LangChainService {
                     msg?.Data ||
                     msg?.Tags?.find((t: any) => t.name === "Balance")?.value ||
                     "0";
-                const ticker = msg?.Tags?.find((t: any) => t.name === "Ticker")?.value;
-                balances.push({ ticker, processId: pid, amount: String(amount) });
+                const ticker = msg?.Tags?.find(
+                    (t: any) => t.name === "Ticker"
+                )?.value;
+                balances.push({
+                    ticker,
+                    processId: pid,
+                    amount: String(amount),
+                });
             } catch (e) {
-                logger.warn("Failed to fetch balance for token", { pid, error: e });
+                logger.warn("Failed to fetch balance for token", {
+                    pid,
+                    error: e,
+                });
             }
         }
 
         // Filter out zero balances
         const nonZero = balances.filter((b) => {
             try {
-                const n = new (require("big.js")) (b.amount || 0);
+                const n = new (require("big.js"))(b.amount || 0);
                 return n.gt(0);
-            } catch { return String(b.amount) !== "0"; }
+            } catch {
+                return String(b.amount) !== "0";
+            }
         });
 
         if (!nonZero.length) return "No balances found.";
@@ -496,16 +553,21 @@ export class LangChainService {
             const pretty = this.formatAmountWithDecimals(b.amount, decimals);
             return `${sym}: ${pretty}`;
         });
-        return "💰 Your balances\n" + lines.join("\n");
+        return "Your balances\n" + lines.join("\n");
     }
 
     private getKnownTokenDecimals(processId: string): number {
         return this.getDecimalsByAliasOrId(processId);
     }
 
-    private async listBalancesForProcess(telegramId: number, tokenProcessId: string): Promise<string> {
+    private async listBalancesForProcess(
+        telegramId: number,
+        tokenProcessId: string
+    ): Promise<string> {
         try {
-            const user = await this.userService.getUserByTelegramId(telegramId.toString());
+            const user = await this.userService.getUserByTelegramId(
+                telegramId.toString()
+            );
             const dryrunResult = await this.aoConnect.dryrun({
                 process: tokenProcessId,
                 tags: [
@@ -517,22 +579,39 @@ export class LangChainService {
             const msg = dryrunResult?.Messages?.[0];
             let data: any = undefined;
             if (msg?.Data) {
-                try { data = typeof msg.Data === "string" ? JSON.parse(msg.Data) : msg.Data; } catch {}
+                try {
+                    data =
+                        typeof msg.Data === "string"
+                            ? JSON.parse(msg.Data)
+                            : msg.Data;
+                } catch {}
             }
             if (!data || typeof data !== "object") return "No balances found.";
             const entries = Object.entries(data) as Array<[string, number]>;
             entries.sort((a, b) => (b[1] as number) - (a[1] as number));
             const top = entries.slice(0, 10);
-            const lines = top.map(([addr, bal]) => `${addr === user?.walletAddress ? "🟢 " : ""}${addr.substring(0, 10)}...: ${bal}`);
-            let response = "📊 Balances (top 10)\n" + lines.join("\n");
+            const lines = top.map(
+                ([addr, bal]) =>
+                    `${
+                        addr === user?.walletAddress ? "* " : ""
+                    }${addr.substring(0, 10)}...: ${bal}`
+            );
+            let response = "Balances (top 10)\n" + lines.join("\n");
             if (user?.walletAddress) {
                 const mine = data[user.walletAddress] ?? 0;
-                response += `\n\nYou (${user.walletAddress.substring(0, 10)}...): ${mine}`;
+                response += `\n\nYou (${user.walletAddress.substring(
+                    0,
+                    10
+                )}...): ${mine}`;
             }
             return response;
         } catch (error) {
-            logger.error("listBalancesForProcess error", { error, telegramId, tokenProcessId });
-            return "❌ Error fetching balances for token.";
+            logger.error("listBalancesForProcess error", {
+                error,
+                telegramId,
+                tokenProcessId,
+            });
+            return "Error fetching balances for token.";
         }
     }
 
@@ -569,7 +648,9 @@ export class LangChainService {
         if (this.SUPPORTED_TOKENS[upper]) {
             return aliasToDecimals[upper] ?? 6;
         }
-        const entry = Object.entries(this.SUPPORTED_TOKENS).find(([, id]) => id === token);
+        const entry = Object.entries(this.SUPPORTED_TOKENS).find(
+            ([, id]) => id === token
+        );
         if (entry) {
             const [alias] = entry;
             return aliasToDecimals[alias] ?? 6;
@@ -586,7 +667,7 @@ export class LangChainService {
                 telegramId.toString()
             );
             if (!user?.walletAddress) {
-                return "❌ Wallet not found. Please create a wallet first using /start";
+                return "Wallet not found. Please create a wallet first using /start";
             }
 
             const tokenId =
@@ -604,52 +685,87 @@ export class LangChainService {
                 msg?.Data ||
                 msg?.Tags?.find((t: any) => t.name === "Balance")?.value ||
                 "0";
-            const decimals = this.getDecimalsByAliasOrId(tokenAliasOrId) || this.getDecimalsByAliasOrId(tokenId);
-            console.log("[specific-balance] token:", tokenAliasOrId, "tokenId:", tokenId, "raw:", raw, "decimals:", decimals);
+            const decimals =
+                this.getDecimalsByAliasOrId(tokenAliasOrId) ||
+                this.getDecimalsByAliasOrId(tokenId);
+            console.log(
+                "[specific-balance] token:",
+                tokenAliasOrId,
+                "tokenId:",
+                tokenId,
+                "raw:",
+                raw,
+                "decimals:",
+                decimals
+            );
             const pretty = this.formatAmountWithDecimals(raw, decimals);
-            const sym = tokenAliasOrId.toUpperCase() === tokenId ? this.pidShort(tokenId) : tokenAliasOrId.toUpperCase();
-            return `💰 ${sym} Balance\n${pretty} ${sym}`;
+            const sym =
+                tokenAliasOrId.toUpperCase() === tokenId
+                    ? this.pidShort(tokenId)
+                    : tokenAliasOrId.toUpperCase();
+            return `${sym} Balance\n${pretty} ${sym}`;
         } catch (error) {
             logger.error("getFormattedUserBalanceForToken error", {
                 error,
                 telegramId,
                 tokenAliasOrId,
             });
-            return "❌ Error fetching token balance.";
+            return "Error fetching token balance.";
         }
     }
 
     /** Parse transfer request sentences */
-    private parseTransferRequest(text: string):
-        | { amountRaw: string; recipient: string; isAll: boolean; tokenSymbol?: string }
-        | null {
+    private parseTransferRequest(text: string): {
+        amountRaw: string;
+        recipient: string;
+        isAll: boolean;
+        tokenSymbol?: string;
+    } | null {
         // Patterns:
         // send 0.11 ao to <addr>
         // send all my ao to <addr>
         // transfer 5 ao to <addr>
         // Capture token symbol and recipient with case preserved
-        const allRe = /\b(send|transfer)\s+(all|max)(?:\s+my)?\s+([a-z0-9_-]{2,})(?:\s+tokens?)?\s+to\s+([A-Za-z0-9_-]{20,})/i;
-        const amtRe = /\b(send|transfer)\s+([0-9]+(?:\.[0-9]+)?)\s*([a-z0-9_-]{2,})(?:\s+tokens?)?\s+to\s+([A-Za-z0-9_-]{20,})/i;
+        const allRe =
+            /\b(send|transfer)\s+(all|max)(?:\s+my)?\s+([a-z0-9_-]{2,})(?:\s+tokens?)?\s+to\s+([A-Za-z0-9_-]{20,})/i;
+        const amtRe =
+            /\b(send|transfer)\s+([0-9]+(?:\.[0-9]+)?)\s*([a-z0-9_-]{2,})(?:\s+tokens?)?\s+to\s+([A-Za-z0-9_-]{20,})/i;
         let m = text.match(allRe);
         if (m) {
-            return { amountRaw: "all", isAll: true, tokenSymbol: m[3], recipient: m[4] };
+            return {
+                amountRaw: "all",
+                isAll: true,
+                tokenSymbol: m[3],
+                recipient: m[4],
+            };
         }
         m = text.match(amtRe);
         if (m) {
-            return { amountRaw: m[2], isAll: false, tokenSymbol: m[3], recipient: m[4] };
+            return {
+                amountRaw: m[2],
+                isAll: false,
+                tokenSymbol: m[3],
+                recipient: m[4],
+            };
         }
         return null;
     }
 
     /** Format token amount by decimals */
-    private formatAmountWithDecimals(amount: string | number, decimals: number): string {
+    private formatAmountWithDecimals(
+        amount: string | number,
+        decimals: number
+    ): string {
         try {
-            const big = new (require("big.js")) (amount || 0);
+            const big = new (require("big.js"))(amount || 0);
             if (decimals > 0) {
-                const denom = new (require("big.js")) (10).pow(decimals);
+                const denom = new (require("big.js"))(10).pow(decimals);
                 const val = big.div(denom);
                 // show up to 6 fractional digits, trim trailing zeros
-                return val.toFixed(6).replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
+                return val
+                    .toFixed(6)
+                    .replace(/\.0+$/, "")
+                    .replace(/(\.\d*?)0+$/, "$1");
             }
             return big.toString();
         } catch {
@@ -658,7 +774,10 @@ export class LangChainService {
     }
 
     /** Get raw balance (base units) for a process/address */
-    private async getRawBalance(processId: string, address: string): Promise<string> {
+    private async getRawBalance(
+        processId: string,
+        address: string
+    ): Promise<string> {
         const res = await this.aoConnect.dryrun({
             process: processId,
             tags: [
@@ -689,23 +808,23 @@ export class LangChainService {
                         telegramId.toString()
                     );
                     if (!user || !user.walletAddress) {
-                        return "❌ Wallet not found. Please create a wallet first using /start";
+                        return "Wallet not found. Please create a wallet first using /start";
                     }
 
-                    return `🔐 **Your AO Wallet Information**
+                    return `**Your AO Wallet Information**
 
-📍 **Address:** \`${user.walletAddress}\`
-📅 **Created:** ${user.createdAt.toLocaleDateString()}
-🌐 **Network:** AO Testnet
-👤 **User:** ${user.firstName || "Unknown"} (ID: ${user.telegramId})
+**Address:** \`${user.walletAddress}\`
+**Created:** ${user.createdAt.toLocaleDateString()}
+**Network:** AO Testnet
+**User:** ${user.firstName || "Unknown"} (ID: ${user.telegramId})
 
-💡 Your wallet is secure and ready for transactions!`;
+Your wallet is secure and ready for transactions!`;
                 } catch (error) {
                     logger.error("Wallet info tool error", {
                         error,
                         telegramId,
                     });
-                    return `❌ Error getting wallet info: ${
+                    return `Error getting wallet info: ${
                         error instanceof Error ? error.message : "Unknown error"
                     }`;
                 }
@@ -805,7 +924,8 @@ Current user's Telegram ID: ${telegramId}`,
             const normLower = lower.replace(/[’`]/g, "'");
             const normQuotes = userMessage.replace(/[’`]/g, "'");
             const asksForAddress =
-                (normLower.includes("wallet") && normLower.includes("address")) ||
+                (normLower.includes("wallet") &&
+                    normLower.includes("address")) ||
                 normLower.includes("my address") ||
                 normLower.includes("what is my address") ||
                 normLower.includes("whats my address") ||
@@ -821,16 +941,18 @@ Current user's Telegram ID: ${telegramId}`,
                 normLower.includes(" send ") ||
                 normLower.includes(" transfer ");
             const asksForSwap =
-                normLower.startsWith("swap ") ||
-                normLower.includes(" swap ");
-            const listBalancesForTokenMatch = normQuotes.match(/\b(list\s+balances\s+for|holders\s+for)\s+([A-Za-z0-9_-]{20,})/i);
-            const specificTokenBalanceAlias = this.parseSpecificBalanceRequest(normQuotes);
+                normLower.startsWith("swap ") || normLower.includes(" swap ");
+            const listBalancesForTokenMatch = normQuotes.match(
+                /\b(list\s+balances\s+for|holders\s+for)\s+([A-Za-z0-9_-]{20,})/i
+            );
+            const specificTokenBalanceAlias =
+                this.parseSpecificBalanceRequest(normQuotes);
             if (asksForAddress) {
                 const user = await this.userService.getUserByTelegramId(
                     telegramId.toString()
                 );
                 if (user?.walletAddress) {
-                    return `📍 Your wallet address is:\n\`${user.walletAddress}\``;
+                    return `Your wallet address is:\n\`${user.walletAddress}\``;
                 }
             }
             if (specificTokenBalanceAlias) {
@@ -844,7 +966,10 @@ Current user's Telegram ID: ${telegramId}`,
             }
             if (listBalancesForTokenMatch) {
                 const tokenProcessId = listBalancesForTokenMatch[2];
-                return await this.listBalancesForProcess(telegramId, tokenProcessId);
+                return await this.listBalancesForProcess(
+                    telegramId,
+                    tokenProcessId
+                );
             }
             if (asksForTransfer) {
                 // Parse from quote-normalized but case-preserving string
@@ -861,8 +986,12 @@ Current user's Telegram ID: ${telegramId}`,
                     const user = await this.userService.getUserByTelegramId(
                         telegramId.toString()
                     );
-                    if (!user || !user.walletAddress || !user.encryptedPrivateKey) {
-                        return "❌ Wallet not found. Please create a wallet first using /start";
+                    if (
+                        !user ||
+                        !user.walletAddress ||
+                        !user.encryptedPrivateKey
+                    ) {
+                        return "Wallet not found. Please create a wallet first using /start";
                     }
 
                     // Decrypt key and build signer
@@ -883,14 +1012,19 @@ Current user's Telegram ID: ${telegramId}`,
                     // Determine quantity
                     let quantity = amountRaw;
                     if (isAll) {
-                        const bal = await this.getRawBalance(processId, user.walletAddress);
+                        const bal = await this.getRawBalance(
+                            processId,
+                            user.walletAddress
+                        );
                         if (bal === "0") return "❌ Insufficient balance.";
                         quantity = bal;
                     } else {
                         const decimals = this.getDecimalsByAliasOrId(processId);
                         if (decimals > 0 && /\./.test(amountRaw)) {
-                            const big = new (require("big.js")) (amountRaw);
-                            const denom = new (require("big.js")) (10).pow(decimals);
+                            const big = new (require("big.js"))(amountRaw);
+                            const denom = new (require("big.js"))(10).pow(
+                                decimals
+                            );
                             quantity = big.times(denom).round(0, 0).toString();
                         }
                     }
@@ -912,7 +1046,8 @@ Current user's Telegram ID: ${telegramId}`,
                         signer,
                         data: "",
                     });
-                    const messageId = typeof sendRes === "string" ? sendRes : sendRes?.id;
+                    const messageId =
+                        typeof sendRes === "string" ? sendRes : sendRes?.id;
 
                     console.log("[direct-transfer] messageId:", messageId);
 
@@ -928,11 +1063,20 @@ Current user's Telegram ID: ${telegramId}`,
                         console.log("[direct-transfer] result fetch error:", e);
                     }
 
-                    const sym = tokenSymbol?.toUpperCase() || (Object.entries(this.SUPPORTED_TOKENS).find(([, id]) => id === processId)?.[0] || "TOKENS");
-                    return `✅ Transfer initiated!\n- Amount: ${isAll ? "ALL" : amountRaw} ${sym}\n- Recipient: \`${recipient}\`\n- TxID: \`${messageId}\``;
+                    const sym =
+                        tokenSymbol?.toUpperCase() ||
+                        Object.entries(this.SUPPORTED_TOKENS).find(
+                            ([, id]) => id === processId
+                        )?.[0] ||
+                        "TOKENS";
+                    return `✅ Transfer initiated!\n- Amount: ${
+                        isAll ? "ALL" : amountRaw
+                    } ${sym}\n- Recipient: \`${recipient}\`\n- TxID: \`${messageId}\``;
                 } catch (e: any) {
                     console.error("[direct-transfer] error:", e);
-                    return `❌ Transfer error: ${e?.message || "Unknown error"}`;
+                    return `❌ Transfer error: ${
+                        e?.message || "Unknown error"
+                    }`;
                 }
             }
 
@@ -947,7 +1091,11 @@ Current user's Telegram ID: ${telegramId}`,
                     const user = await this.userService.getUserByTelegramId(
                         telegramId.toString()
                     );
-                    if (!user || !user.walletAddress || !user.encryptedPrivateKey) {
+                    if (
+                        !user ||
+                        !user.walletAddress ||
+                        !user.encryptedPrivateKey
+                    ) {
                         return "❌ Wallet not found. Please create a wallet first using /start";
                     }
                     const privateKey = this.encryptionService.decrypt(
@@ -958,16 +1106,18 @@ Current user's Telegram ID: ${telegramId}`,
 
                     const client = new VentoClient({ signer });
 
-            const fromTokenId = this.SUPPORTED_TOKENS[fromSymbol.toUpperCase()];
-            const toTokenId = this.SUPPORTED_TOKENS[toSymbol.toUpperCase()];
-            if (!fromTokenId || !toTokenId) {
-                return "❌ Token not supported. Supported: AO, ARIO, WAR, WUSDC, WUSDT, WETH, USDA, VAR, VUSDC, VDAI, VETH";
-            }
+                    const fromTokenId =
+                        this.SUPPORTED_TOKENS[fromSymbol.toUpperCase()];
+                    const toTokenId =
+                        this.SUPPORTED_TOKENS[toSymbol.toUpperCase()];
+                    if (!fromTokenId || !toTokenId) {
+                        return "❌ Token not supported. Supported: AO, ARIO, WAR, WUSDC, WUSDT, WETH, USDA, VAR, VUSDC, VDAI, VETH";
+                    }
 
                     // Convert display amount to base units based on token decimals
                     const decimals = this.getDecimalsByAliasOrId(fromTokenId);
-                    const big = new (require("big.js")) (amountRaw);
-                    const denom = new (require("big.js")) (10).pow(decimals);
+                    const big = new (require("big.js"))(amountRaw);
+                    const denom = new (require("big.js"))(10).pow(decimals);
                     const amountBase = big.times(denom).round(0, 0).toString();
 
                     console.log("[direct-swap] quoting:", {
@@ -1004,7 +1154,9 @@ Current user's Telegram ID: ${telegramId}`,
 
                     console.log("[direct-swap] result:", result);
 
-                    return `🔄 Swap submitted!\n- From: ${amountRaw} ${fromSymbol.toUpperCase()}\n- To: ${toSymbol.toUpperCase()}\n- Message: ${result.messageId || "submitted"}`;
+                    return `🔄 Swap submitted!\n- From: ${amountRaw} ${fromSymbol.toUpperCase()}\n- To: ${toSymbol.toUpperCase()}\n- Message: ${
+                        result.messageId || "submitted"
+                    }`;
                 } catch (e: any) {
                     console.error("[direct-swap] error:", e);
                     return `❌ Swap error: ${e?.message || "Unknown error"}`;
@@ -1049,7 +1201,10 @@ Current user's Telegram ID: ${telegramId}`,
                 responseLength: (result as any)?.output?.length || 0,
             });
 
-            if ((result as any)?.output && typeof (result as any).output === "string")
+            if (
+                (result as any)?.output &&
+                typeof (result as any).output === "string"
+            )
                 return (result as any).output;
             return "I apologize, but I couldn't process your request. Please try again.";
         } catch (error) {
@@ -1142,13 +1297,25 @@ Current user's Telegram ID: ${telegramId}`,
                 try {
                     const args = JSON.parse(input || "{}");
                     const amountRaw: string = String(args.amount);
-                    const from = (args.fromSymbol || args.fromTokenId || "AO").toString();
-                    const to = (args.toSymbol || args.toTokenId || "ARIO").toString();
+                    const from = (
+                        args.fromSymbol ||
+                        args.fromTokenId ||
+                        "AO"
+                    ).toString();
+                    const to = (
+                        args.toSymbol ||
+                        args.toTokenId ||
+                        "ARIO"
+                    ).toString();
 
                     const user = await this.userService.getUserByTelegramId(
                         telegramId.toString()
                     );
-                    if (!user || !user.walletAddress || !user.encryptedPrivateKey) {
+                    if (
+                        !user ||
+                        !user.walletAddress ||
+                        !user.encryptedPrivateKey
+                    ) {
                         return "❌ Wallet not found. Please create a wallet first using /start";
                     }
 
@@ -1160,15 +1327,16 @@ Current user's Telegram ID: ${telegramId}`,
 
                     const client = new VentoClient({ signer });
 
-            const fromTokenId = this.SUPPORTED_TOKENS[from.toUpperCase()];
-            const toTokenId = this.SUPPORTED_TOKENS[to.toUpperCase()];
-            if (!fromTokenId || !toTokenId) {
-                return "❌ Token not supported. Supported: AO, ARIO, WAR, WUSDC, WUSDT, WETH, USDA, VAR, VUSDC, VDAI, VETH";
-            }
+                    const fromTokenId =
+                        this.SUPPORTED_TOKENS[from.toUpperCase()];
+                    const toTokenId = this.SUPPORTED_TOKENS[to.toUpperCase()];
+                    if (!fromTokenId || !toTokenId) {
+                        return "❌ Token not supported. Supported: AO, ARIO, WAR, WUSDC, WUSDT, WETH, USDA, VAR, VUSDC, VDAI, VETH";
+                    }
 
                     const decimals = this.getDecimalsByAliasOrId(fromTokenId);
-                    const big = new (require("big.js")) (amountRaw);
-                    const denom = new (require("big.js")) (10).pow(decimals);
+                    const big = new (require("big.js"))(amountRaw);
+                    const denom = new (require("big.js"))(10).pow(decimals);
                     const amountBase = big.times(denom).round(0, 0).toString();
 
                     const quote = await client.getSwapQuote({
@@ -1192,9 +1360,14 @@ Current user's Telegram ID: ${telegramId}`,
                         minAmount,
                         user.walletAddress
                     );
-                    return `✅ Swap initiated!\n- From: ${amountRaw} ${from.toUpperCase()}\n- To: ${to.toUpperCase()}\n- Message: ${result.messageId || "submitted"}`;
+                    return `✅ Swap initiated!\n- From: ${amountRaw} ${from.toUpperCase()}\n- To: ${to.toUpperCase()}\n- Message: ${
+                        result.messageId || "submitted"
+                    }`;
                 } catch (error) {
-                    logger.error("swap-tokens tool error", { error, telegramId });
+                    logger.error("swap-tokens tool error", {
+                        error,
+                        telegramId,
+                    });
                     return `❌ Swap tool error: ${
                         error instanceof Error ? error.message : "Unknown error"
                     }`;
@@ -1203,11 +1376,12 @@ Current user's Telegram ID: ${telegramId}`,
         });
     }
 
-    private parseSwapRequest(text: string):
-        | { amountRaw: string; fromSymbol: string; toSymbol: string }
-        | null {
+    private parseSwapRequest(
+        text: string
+    ): { amountRaw: string; fromSymbol: string; toSymbol: string } | null {
         // swap 0.1 ao to ario
-        const re = /\bswap\s+([0-9]+(?:\.[0-9]+)?)\s+([a-z0-9_-]{2,})\s+to\s+([a-z0-9_-]{2,})/i;
+        const re =
+            /\bswap\s+([0-9]+(?:\.[0-9]+)?)\s+([a-z0-9_-]{2,})\s+to\s+([a-z0-9_-]{2,})/i;
         const m = text.match(re);
         if (!m) return null;
         return { amountRaw: m[1], fromSymbol: m[2], toSymbol: m[3] };
