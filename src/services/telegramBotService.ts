@@ -289,7 +289,7 @@ export class TelegramBotService {
             message += `*To check token balances, use:*\n`;
             message += `/token_balance <token_process_id>`;
 
-            await this.safeEditMessage(ctx, message, {
+            await this.safeEditMessageText(ctx, message, {
                 parse_mode: "Markdown",
             });
         } catch (error) {
@@ -330,7 +330,11 @@ export class TelegramBotService {
         try {
             const user = ctx.user;
 
-            await ctx.reply("Loading transaction history...");
+            const loadingMessage = await this.safeSendMessage(
+                ctx,
+                "Loading transaction history..."
+            );
+            if (!loadingMessage) return; // User blocked bot
 
             const transactions = await userService.getUserTransactions(
                 user.id,
@@ -338,7 +342,8 @@ export class TelegramBotService {
             );
 
             if (transactions.length === 0) {
-                await ctx.editMessageText(
+                await this.safeEditMessageText(
+                    ctx,
                     "**Transaction History**\n\nNo transactions found."
                 );
                 return;
@@ -357,12 +362,15 @@ export class TelegramBotService {
                 message += `   \`${tx.txId.substring(0, 20)}...\`\n\n`;
             });
 
-            await ctx.editMessageText(message, {
+            await this.safeEditMessageText(ctx, message, {
                 parse_mode: "Markdown",
             });
         } catch (error) {
             logger.error("Error in history command:", error);
-            await ctx.reply("Failed to fetch transaction history.");
+            await this.safeSendMessage(
+                ctx,
+                "Failed to fetch transaction history."
+            );
         }
     }
 
@@ -482,7 +490,11 @@ export class TelegramBotService {
         try {
             const user = ctx.user;
 
-            await ctx.reply("Loading statistics...");
+            const loadingMessage = await this.safeSendMessage(
+                ctx,
+                "Loading statistics..."
+            );
+            if (!loadingMessage) return; // User blocked bot
 
             const stats = await userService.getUserStats(user.id);
 
@@ -494,12 +506,12 @@ export class TelegramBotService {
             message += `**Success Rate:** ${stats.successRate.toFixed(1)}%\n\n`;
             message += `**Member Since:** ${user.createdAt.toLocaleDateString()}`;
 
-            await ctx.editMessageText(message, {
+            await this.safeEditMessageText(ctx, message, {
                 parse_mode: "Markdown",
             });
         } catch (error) {
             logger.error("Error in stats command:", error);
-            await ctx.reply("Failed to fetch statistics.");
+            await this.safeSendMessage(ctx, "Failed to fetch statistics.");
         }
     }
 
@@ -531,12 +543,16 @@ export class TelegramBotService {
      * Handle conversation messages
      */
     private async handleConversationMessage(ctx: BotContext): Promise<void> {
+        const telegramId = ctx.from?.id;
+        const userMessage = (ctx.message as any)?.text;
+
+        if (!telegramId || !userMessage) return;
+
+        // Send "Thinking..." message immediately
+        const thinkingMessage = await this.safeSendMessage(ctx, "Thinking...");
+        if (!thinkingMessage) return; // User blocked bot
+
         try {
-            const telegramId = ctx.from?.id;
-            const userMessage = (ctx.message as any)?.text;
-
-            if (!telegramId || !userMessage) return;
-
             // Show typing indicator
             await ctx.sendChatAction("typing");
 
@@ -569,11 +585,21 @@ export class TelegramBotService {
             // Update conversation history (keep last 20 messages)
             this.conversationHistory.set(telegramId, history.slice(-20));
 
-            // Send response
-            const sent = await this.safeSendMessage(ctx, aiResponse, {
-                parse_mode: "Markdown",
-            });
-            if (!sent) return; // User blocked bot
+            // Replace "Thinking..." message with the final response
+            const edited = await this.safeEditMessage(
+                ctx,
+                thinkingMessage,
+                aiResponse,
+                {
+                    parse_mode: "Markdown",
+                }
+            );
+            if (!edited) {
+                // If editing failed, send a new message as fallback
+                await this.safeSendMessage(ctx, aiResponse, {
+                    parse_mode: "Markdown",
+                });
+            }
 
             logger.info("Conversation message processed", {
                 telegramId,
@@ -582,10 +608,17 @@ export class TelegramBotService {
             });
         } catch (error) {
             logger.error("Error in conversation message:", error);
-            await this.safeSendMessage(
+            // Try to edit the thinking message with error, or send new message if edit fails
+            const errorMessage =
+                "I encountered an error processing your message. Please try again.";
+            const errorEdited = await this.safeEditMessage(
                 ctx,
-                "I encountered an error processing your message. Please try again."
+                thinkingMessage,
+                errorMessage
             );
+            if (!errorEdited) {
+                await this.safeSendMessage(ctx, errorMessage);
+            }
         }
     }
 
@@ -764,17 +797,17 @@ export class TelegramBotService {
         ctx: BotContext,
         message: string,
         options?: any
-    ): Promise<boolean> {
+    ): Promise<any | null> {
         try {
-            await ctx.reply(message, options);
-            return true;
+            const sentMessage = await ctx.reply(message, options);
+            return sentMessage;
         } catch (error: any) {
             if (error.code === 403) {
                 logger.warn("Cannot send message - user blocked bot", {
                     telegramId: ctx.from?.id,
                     error: error.description,
                 });
-                return false;
+                return null;
             }
 
             if (
@@ -785,7 +818,7 @@ export class TelegramBotService {
                     telegramId: ctx.from?.id,
                     error: error.description,
                 });
-                return false;
+                return null;
             }
 
             // Re-throw other errors
@@ -794,9 +827,72 @@ export class TelegramBotService {
     }
 
     /**
-     * Safely edit a message, handling blocked users
+     * Safely edit a specific message, handling blocked users and other common errors
      */
     private async safeEditMessage(
+        ctx: BotContext,
+        messageToEdit: any,
+        newText: string,
+        options?: any
+    ): Promise<boolean> {
+        try {
+            await ctx.telegram.editMessageText(
+                ctx.chat?.id,
+                messageToEdit.message_id,
+                undefined,
+                newText,
+                options
+            );
+            return true;
+        } catch (error: any) {
+            if (error.code === 403) {
+                logger.warn("Cannot edit message - user blocked bot", {
+                    telegramId: ctx.from?.id,
+                    error: error.description,
+                });
+                return false;
+            }
+
+            if (
+                error.code === 400 &&
+                error.description?.includes("chat not found")
+            ) {
+                logger.warn("Cannot edit message - chat not found", {
+                    telegramId: ctx.from?.id,
+                    error: error.description,
+                });
+                return false;
+            }
+
+            if (
+                error.code === 400 &&
+                (error.description?.includes("message is not modified") ||
+                    error.description?.includes("message to edit not found") ||
+                    error.description?.includes("message can't be edited"))
+            ) {
+                logger.warn("Cannot edit message - message edit failed", {
+                    telegramId: ctx.from?.id,
+                    error: error.description,
+                });
+                return false;
+            }
+
+            // Log the error for debugging
+            logger.error("Error editing message", {
+                telegramId: ctx.from?.id,
+                error: error.description,
+                code: error.code,
+            });
+
+            // Re-throw other errors
+            throw error;
+        }
+    }
+
+    /**
+     * Safely edit a message using context (for backward compatibility)
+     */
+    private async safeEditMessageText(
         ctx: BotContext,
         message: string,
         options?: any
@@ -818,6 +914,19 @@ export class TelegramBotService {
                 error.description?.includes("chat not found")
             ) {
                 logger.warn("Cannot edit message - chat not found", {
+                    telegramId: ctx.from?.id,
+                    error: error.description,
+                });
+                return false;
+            }
+
+            if (
+                error.code === 400 &&
+                (error.description?.includes("message is not modified") ||
+                    error.description?.includes("message to edit not found") ||
+                    error.description?.includes("message can't be edited"))
+            ) {
+                logger.warn("Cannot edit message - message edit failed", {
                     telegramId: ctx.from?.id,
                     error: error.description,
                 });
